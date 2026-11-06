@@ -1,0 +1,23 @@
+# Reglas de trabajo con IA
+
+## 1. Aprobación humana
+- Antes de modificar, crear, eliminar o renombrar archivos, presentar el alcance y esperar aprobación explícita de una persona.
+- Una aprobación cubre únicamente el alcance acordado. Si cambia, pedir nueva aprobación.
+- Leer y evaluar sin cambios no requiere aprobación. No hacer commits, push ni despliegues sin autorización explícita.
+
+## 2. Documentación
+- Escribir en español, con precisión y sin explicaciones obvias.
+- Cada documento debe tener menos de 500 palabras. Usar árboles o diagramas con comentarios breves cuando expliquen la estructura.
+- Incluir el detalle necesario para trabajar; evitar repetir lo que ya muestra el diagrama o extenderse con teoría.
+
+## 3. Temporales y pruebas
+- Los archivos temporales y las comprobaciones exploratorias se crean, se ejecutan y se eliminan al terminar. No se conservan ni se versionan.
+- Conservar únicamente pruebas end-to-end y pruebas unitarias específicas de comportamiento relevante.
+- No añadir pruebas redundantes que solo reproduzcan la implementación.
+- La aprobación de una tarea incluye limpiar los temporales creados para esa tarea; no borrar archivos previos o ajenos.
+
+## 4. Cambios de código
+- Ejecutar las pruebas que correspondan al comportamiento y a los módulos afectados.
+- Si una prueba queda obsoleta, actualizarla para verificar el comportamiento vigente o eliminarla cuando ya no tenga propósito.
+- No eliminar ni debilitar una prueba solo para ocultar una regresión.
+- Informar qué se verificó, el resultado y cualquier comprobación que no pudo ejecutarse.
