@@ -37,4 +37,12 @@ Inicio, mensaje o menú, captura validada, condición, variable, catálogo y car
 
 - [Estructura del repositorio](docs/estructura.md)
 - [Arquitectura del frontend](docs/frontend.md)
+- [Arquitectura del backend](docs/backend.md)
+- [Plan de trabajo](docs/plan-trabajo.md)
+- [Desarrollo local](docs/desarrollo-local.md)
+- [CI y entrega por servicio](docs/ci-cd.md)
 - [Reglas de trabajo con IA](.ai)
+
+## Estado actual
+
+Base local de frontend, API y worker. PostgreSQL y Redis mediante Docker Compose. El editor, los módulos de negocio y la conexión con Meta siguen pendientes. CI selectivo con ESLint y análisis de seguridad. Entrega por artefactos; despliegue pendiente de hosting.

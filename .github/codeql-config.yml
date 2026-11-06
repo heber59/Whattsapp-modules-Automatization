@@ -1,0 +1,10 @@
+name: JavaScript y TypeScript
+paths:
+  - apps
+  - packages
+  - scripts
+paths-ignore:
+  - '**/node_modules/**'
+  - '**/.next/**'
+  - '**/dist/**'
+  - '**/coverage/**'
