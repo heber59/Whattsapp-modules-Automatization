@@ -22,7 +22,8 @@
     "audit:security": "pnpm audit --audit-level=high",
     "package:web": "node scripts/ci/package.mjs web",
     "package:api": "node scripts/ci/package.mjs api",
-    "package:worker": "node scripts/ci/package.mjs worker"
+    "package:worker": "node scripts/ci/package.mjs worker",
+    "db:migrate": "pnpm --filter @wa/api db:migrate"
   },
   "devDependencies": {
     "typescript-eslint": "8.72.1",

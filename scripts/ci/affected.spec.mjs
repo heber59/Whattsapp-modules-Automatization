@@ -17,6 +17,8 @@ test('documentación no ejecuta servicios; frontend no ejecuta backend', () => {
 test('separación de API y worker, incluyendo eliminación y cambios compartidos', () => {
   const api = affected(['apps/api/src/health/health.service.ts']);
   assert(api.api && !api.worker && !api.web);
+  const auth = affected(['apps/api/src/shared/auth/access.guard.ts', 'apps/api/test/security.e2e-spec.ts', 'apps/api/src/modules/auth/auth.service.ts']);
+  assert(auth.api && !auth.worker && !auth.web);
   const worker = affected(['apps/api/src/worker.ts']);
   assert(worker.worker && !worker.api && !worker.web);
   const shared = affected(['apps/api/src/shared/config/config.ts']);

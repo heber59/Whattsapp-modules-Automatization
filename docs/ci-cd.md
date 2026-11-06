@@ -5,7 +5,7 @@ GitHub Actions verifica PR hacia develop/main y cambios publicados en esas ramas
 | Cambio | Verificación |
 | --- | --- |
 | apps/web/ | Frontend: ESLint, tipos y build; sin PostgreSQL ni Redis. |
-| Entrada HTTP o health | API: ESLint, tipos, unitarios, end-to-end y build; PostgreSQL y Redis temporales. |
+| HTTP, health, identidad o acceso | API: ESLint, tipos, unitarios, end-to-end y build; PostgreSQL y Redis temporales. |
 | Entrada o consumidor del worker | Worker: ESLint, tipos, unitarios, end-to-end y build; solo Redis. |
 | Infraestructura o código compartido del backend | API y worker. |
 | packages/contracts/ | Contratos y sus consumidores: frontend, API y worker. |
