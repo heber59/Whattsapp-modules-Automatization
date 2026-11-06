@@ -33,3 +33,8 @@ Inicio, mensaje o menú, captura validada, condición, variable, catálogo y car
 | Procesamiento asíncrono | Colas y workers; BullMQ + Redis o equivalente durable por evaluar |
 | Infraestructura | Hosting económico o gratuito compatible con uso comercial, pendiente de validación |
 
+## Documentación
+
+- [Estructura del repositorio](docs/estructura.md)
+- [Arquitectura del frontend](docs/frontend.md)
+- [Reglas de trabajo con IA](.ai)
