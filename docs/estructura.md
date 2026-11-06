@@ -12,7 +12,8 @@ Whattsapp-modules-Automatization/
 │   └── contracts/            # Tipos y esquemas públicos de API
 ├── docs/
 │   ├── estructura.md         # Organización del repositorio
-│   └── frontend.md           # Arquitectura y carpetas del frontend
+│   ├── frontend.md           # Arquitectura y carpetas del frontend
+│   └── backend.md            # Arquitectura y responsabilidades del backend
 ├── package.json              # Scripts del monorepo
 ├── pnpm-workspace.yaml       # Workspaces: apps/* y packages/*
 └── README.md                 # Presentación del producto

@@ -37,4 +37,5 @@ Inicio, mensaje o menú, captura validada, condición, variable, catálogo y car
 
 - [Estructura del repositorio](docs/estructura.md)
 - [Arquitectura del frontend](docs/frontend.md)
+- [Arquitectura del backend](docs/backend.md)
 - [Reglas de trabajo con IA](.ai)
