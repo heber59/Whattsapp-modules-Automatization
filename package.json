@@ -1,0 +1,35 @@
+{
+  "name": "whattsapp-automatization",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.34.9",
+  "engines": {
+    "node": ">=22.22.2 <23"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @wa/web --filter @wa/api dev",
+    "dev:web": "pnpm --filter @wa/web dev",
+    "dev:api": "pnpm --filter @wa/api dev",
+    "dev:worker": "pnpm --filter @wa/api dev:worker",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm --filter @wa/api test",
+    "test:e2e": "pnpm --filter @wa/api test:e2e",
+    "infra:up": "docker compose up -d --wait",
+    "infra:down": "docker compose down",
+    "lint": "eslint . --max-warnings=0",
+    "test:ci": "node --test scripts/ci/affected.spec.mjs",
+    "audit:security": "pnpm audit --audit-level=high",
+    "package:web": "node scripts/ci/package.mjs web",
+    "package:api": "node scripts/ci/package.mjs api",
+    "package:worker": "node scripts/ci/package.mjs worker"
+  },
+  "devDependencies": {
+    "typescript-eslint": "8.72.1",
+    "globals": "17.14.0",
+    "@eslint/js": "10.0.1",
+    "eslint": "10.14.0",
+    "@next/eslint-plugin-next": "16.4.5",
+    "eslint-plugin-react-hooks": "7.1.1"
+  }
+}
