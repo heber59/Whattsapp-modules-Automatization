@@ -21,3 +21,11 @@
 - Si una prueba queda obsoleta, actualizarla para verificar el comportamiento vigente o eliminarla cuando ya no tenga propósito.
 - No eliminar ni debilitar una prueba solo para ocultar una regresión.
 - Informar qué se verificó, el resultado y cualquier comprobación que no pudo ejecutarse.
+
+## 5. Publicación
+- «Publica» autoriza actualizar las referencias remotas, crear una rama de trabajo desde origin/develop actualizado, verificar los cambios, hacer commit, subir la rama y entregar el enlace para abrir el MR hacia develop.
+- «Publica a main» sigue los mismos pasos y cambia únicamente el destino del MR a main. La rama de trabajo siempre parte de develop, nunca de main.
+- Usar nombres descriptivos para ramas y commits. Incluir solo los cambios acordados y conservar cualquier trabajo ajeno.
+- Si los cambios están en otra rama, trasladarlos sin perderlos a la nueva rama basada en develop.
+- Entregar rama, commit y enlace con origen/destino explícitos. No crear ni fusionar el MR, ni desplegar, salvo autorización adicional.
+- Si develop contiene cambios pendientes de promover a main, el MR hacia main también los incluirá; revisar y comunicar su alcance.
