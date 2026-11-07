@@ -41,8 +41,11 @@ Inicio, mensaje o menú, captura validada, condición, variable, catálogo y car
 - [Plan de trabajo](docs/plan-trabajo.md)
 - [Desarrollo local](docs/desarrollo-local.md)
 - [CI y entrega por servicio](docs/ci-cd.md)
+- [Base de datos](docs/bd.md)
+- [Autenticación y límites](docs/auth-seguridad.md)
+- [Recorrido en Postman](docs/postman.md)
 - [Reglas de trabajo con IA](.ai)
 
 ## Estado actual
 
-Base local de frontend, API y worker. PostgreSQL y Redis mediante Docker Compose. El editor, los módulos de negocio y la conexión con Meta siguen pendientes. CI selectivo con ESLint y análisis de seguridad. Entrega por artefactos; despliegue pendiente de hosting.
+Base local de frontend, API y worker. PostgreSQL y Redis mediante Docker Compose. Identidad y negocios tienen una base protegida con Supabase Auth y límites por IP/usuario. POST /auth/login permite probar desde Postman. El login del frontend sigue pendiente. Editor, pedidos y Meta siguen pendientes. CI selectivo con ESLint y análisis de seguridad. Entrega por artefactos; despliegue pendiente de hosting.

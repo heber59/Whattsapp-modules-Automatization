@@ -7,6 +7,7 @@ nvm use
 corepack pnpm install
 cp .env.example .env
 corepack pnpm infra:up
+corepack pnpm db:migrate
 corepack pnpm dev
 ```
 
@@ -25,7 +26,7 @@ corepack pnpm dev:worker
 
 Las conexiones locales están limitadas al equipo. Las credenciales del ejemplo son exclusivas de desarrollo. Si modificas puertos o contraseña, actualiza también DATABASE_URL o REDIS_URL. Con un volumen PostgreSQL existente, cambiar la contraseña del archivo no cambia la del servidor.
 
-La API devuelve 200 si PostgreSQL y Redis responden; 503 si alguna dependencia deja de responder. No certifica la disponibilidad del worker. La prueba end-to-end comprueba el procesamiento real de un trabajo de sistema.
+El endpoint público /health devuelve 200 si PostgreSQL y Redis responden; 503 si alguna dependencia deja de responder. No certifica la disponibilidad del worker. La prueba end-to-end comprueba el procesamiento real de un trabajo de sistema.
 
 ## Verificación
 Con infraestructura encendida:
@@ -56,3 +57,8 @@ corepack pnpm infra:down
 ```
 
 Los volúmenes conservan datos. CI selectivo y entrega por artefactos: ver ci-cd.md. Sin despliegue ni secretos de Meta configurados.
+
+Identidad y negocios requieren SUPABASE_URL y SUPABASE_PUBLISHABLE_KEY. Sin ellas, sus rutas privadas responden 503. Ver auth-seguridad.md. Las pruebas de seguridad usan un proveedor simulado y solo PostgreSQL local; no conectan a Supabase remoto. Ver bd.md para el esquema y las migraciones.
+
+## Swagger
+En desarrollo, http://localhost:3001 redirige a /docs. La consola muestra el enlace directo; /docs-json expone OpenAPI. En producción no se montan la documentación ni la redirección. Authorize acepta un access_token de Supabase; las rutas privadas conservan sus permisos y límites. El token no se guarda entre recargas. Reiniciar el proceso de la API después de modificar su arranque.

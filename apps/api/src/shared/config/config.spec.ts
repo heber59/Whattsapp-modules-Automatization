@@ -16,6 +16,9 @@ test('rechaza protocolos incorrectos, puertos inválidos y orígenes con ruta', 
     { WEB_ORIGIN: 'not-an-origin' },
     { REDIS_URL: 'postgresql://localhost' },
     { PORT: 70000 },
+    { RATE_LIMIT_IP_LIMIT: 0 },
+    { SUPABASE_URL: 'https://example.supabase.co' },
+    { SUPABASE_URL: 'http://external.invalid', SUPABASE_PUBLISHABLE_KEY: 'test' },
     { WEB_ORIGIN: 'http://localhost:3000/private' },
   ]) assert.throws(() => validateEnvironment({ ...valid, ...patch }));
 });

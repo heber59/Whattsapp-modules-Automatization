@@ -1,0 +1,142 @@
+{
+  "info": {
+    "name": "Whattsapp Automatization · Local",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Pruebas del backend local. Importar, completar el cuerpo del login y ejecutar en orden. No compartir ni exportar tokens guardados."
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3001"
+    },
+    {
+      "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "business_id",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1 · Estado",
+      "request": {
+        "method": "GET",
+        "auth": {
+          "type": "noauth"
+        },
+        "url": "{{base_url}}/health"
+      }
+    },
+    {
+      "name": "2 · Iniciar sesión",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "  pm.collectionVariables.set('access_token', pm.response.json().access_token);",
+              "} else {",
+              "  pm.collectionVariables.unset('access_token');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "auth": {
+          "type": "noauth"
+        },
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"\",\n  \"password\": \"\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{base_url}}/auth/login",
+        "description": "Completa email y password con tu usuario de Supabase Auth. La respuesta guarda access_token en la colección para las siguientes peticiones."
+      }
+    },
+    {
+      "name": "3 · Mi perfil",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/identity/me"
+      }
+    },
+    {
+      "name": "4 · Crear negocio",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 201) {",
+              "  pm.collectionVariables.set('business_id', pm.response.json().id);",
+              "} else {",
+              "  pm.collectionVariables.unset('business_id');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Mi comercio\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{base_url}}/businesses"
+      }
+    },
+    {
+      "name": "5 · Mis negocios",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/businesses"
+      }
+    },
+    {
+      "name": "6 · Detalle del negocio",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/businesses/{{business_id}}"
+      }
+    }
+  ]
+}

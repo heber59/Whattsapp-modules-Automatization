@@ -24,10 +24,15 @@ f11 cierra viernes; s1 revisa bloqueos y reajusta sábado. La aprobación de Met
 - Variables de ejemplo sin credenciales productivas.
 - Build, comprobación de tipos, pruebas unitarias de configuración y recorrido end-to-end de API/cola.
 
-La base no incluye migraciones del producto, integración Meta, pedidos ni flujo comercial. f3 queda parcial respecto al HTML: CI está configurado y requiere publicación para validarse en GitHub. El despliegue espera hosting; React Flow se incorpora en el bloque del editor.
+Existe migración inicial de identidad, negocios, números y productos. Meta, pedidos y flujo comercial siguen pendientes. f3 queda parcial respecto al HTML: CI está configurado; revisar la ejecución del MR correspondiente. El despliegue espera hosting; React Flow se incorpora en el bloque del editor.
 
 ## Seguimiento
 Pendiente → En curso → Implementado → Verificado. Registrar bloqueos con responsable y siguiente acción. Una tarea se verifica con evidencia; el calendario no sustituye la aceptación.
 
 ## Evidencia de la base local
-Verificados: tipos, build, pruebas unitarias y recorridos end-to-end separados de API y worker. Comprobación adicional de compilados: frontend y API por HTTP, trabajo procesado por el worker, respuesta 503 sin Redis y recuperación al reiniciarlo. La comprobación temporal se eliminó. Bloques de negocio pendientes; CI y entrega por artefactos configurados; sin despliegue.
+Verificados: tipos, build, pruebas unitarias y recorridos end-to-end separados de API y worker. Comprobación adicional de compilados: frontend y API por HTTP, trabajo procesado por el worker, respuesta 503 sin Redis y recuperación al reiniciarlo. La comprobación temporal se eliminó. Base de identidad y negocios implementada; CI y entrega por artefactos configurados; sin despliegue.
+
+## Datos y acceso: avance
+Migración local, perfiles, membresías, aislamiento y buckets por IP/usuario verificados. Supabase se simuló como proveedor en las pruebas; proyecto conectado para Auth; CAPTCHA/MFA y acceso del frontend pendientes. Facturación por cuenta o negocio pendiente de decisión. Ver bd.md y auth-seguridad.md.
+
+POST /auth/login implementado para pruebas desde Postman: entrega access_token y aplica límites por IP/cuenta. Validación automática con proveedor simulado; login real pendiente de prueba manual. Ver postman.md.
