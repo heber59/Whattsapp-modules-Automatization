@@ -30,3 +30,17 @@ test('configuration errors do not expose credentials', () => {
       && error.message.includes('DATABASE_URL') && !error.message.includes('secret'),
   );
 });
+
+test('HTTP binding and proxy trust require explicit valid network addresses', () => {
+  const defaults = validateEnvironment(valid);
+  assert.equal(defaults.HTTP_HOST, '127.0.0.1');
+  assert.deepEqual(defaults.TRUSTED_PROXIES, []);
+  const settings = validateEnvironment({ ...valid, HTTP_HOST: '::', TRUSTED_PROXIES: '10.20.0.5/32, ::1/128, 192.0.2.10' });
+  assert.deepEqual(settings.TRUSTED_PROXIES, ['10.20.0.5/32', '::1/128', '192.0.2.10']);
+  for (const HTTP_HOST of ['', 'localhost', '0.0.0.0:3001', '256.0.0.1']) {
+    assert.throws(() => validateEnvironment({ ...valid, HTTP_HOST }));
+  }
+  for (const TRUSTED_PROXIES of ['true', 'false', '1', 'loopback', '0.0.0.0/0', '::/0', '10.0.0.1/33', '::1/129', '10.0.0.1/-1', '10.0.0.1/', '127.0.0.1,', 'invalid']) {
+    assert.throws(() => validateEnvironment({ ...valid, TRUSTED_PROXIES }));
+  }
+});

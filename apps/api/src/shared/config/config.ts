@@ -1,4 +1,13 @@
 import { z } from 'zod';
+import { isIP } from 'node:net';
+
+function isProxyAddress(value: string): boolean {
+  const [address, prefix, ...extra] = value.split('/');
+  const family = isIP(address ?? '');
+  if (!family || extra.length) return false;
+  if (prefix === undefined) return true;
+  return /^\d+$/.test(prefix) && Number(prefix) > 0 && Number(prefix) <= (family === 4 ? 32 : 128);
+}
 
 function hasProtocol(value: string, protocols: string[]): boolean {
   try { return protocols.includes(new URL(value).protocol); } catch { return false; }
@@ -12,6 +21,9 @@ const optionalText = z.preprocess((value) => value === '' ? undefined : value, z
 const environmentSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(3001),
+  HTTP_HOST: z.string().refine((value) => isIP(value) !== 0, 'HTTP_HOST must be an IP address').default('127.0.0.1'),
+  TRUSTED_PROXIES: z.string().default('').transform((value) => value === '' ? [] : value.split(',').map((entry) => entry.trim()))
+    .refine((addresses) => addresses.every(isProxyAddress), 'TRUSTED_PROXIES must contain explicit IP addresses or nonzero CIDR ranges'),
   WEB_ORIGIN: urlWithProtocols(['http:', 'https:']).refine(
     (value) => {
       try { return new URL(value).origin === value; } catch { return false; }

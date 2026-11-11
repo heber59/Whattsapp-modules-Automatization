@@ -4,6 +4,7 @@ import { randomInt, randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { test } from 'node:test';
+import { spawnSync } from 'node:child_process';
 import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import Redis from 'ioredis';
@@ -11,8 +12,10 @@ import { AppModule } from '../src/app.module';
 import { DatabaseService } from '../src/shared/database/database.service';
 import { migrate } from '../src/shared/database/migrate';
 import { validateEnvironment } from '../src/shared/config/config';
+import { FixtureCleanup } from './fixture-cleanup';
 
 async function fixture(overrides: Record<string, unknown> = {}) {
+  const cleanup = new FixtureCleanup();
   const identities = { alice: randomUUID(), bob: randomUUID(), anonymous: randomUUID() };
   let providerCalls = 0;
   const provider = createServer(async (request, response) => {
@@ -57,54 +60,79 @@ async function fixture(overrides: Record<string, unknown> = {}) {
       app_metadata: {}, user_metadata: { role: 'owner', business_id: randomUUID() },
     }));
   });
-  await new Promise<void>((resolve) => provider.listen(0, '127.0.0.1', resolve));
-  const base = validateEnvironment(process.env);
-  assert(['localhost', '127.0.0.1'].includes(new URL(base.DATABASE_URL).hostname), 'Use local test PostgreSQL only');
-  const settings = {
-    ...base, NODE_ENV: 'test',
-    SUPABASE_URL: 'http://127.0.0.1:' + (provider.address() as AddressInfo).port,
-    SUPABASE_PUBLISHABLE_KEY: 'test-publishable-key',
-    RATE_LIMIT_PREFIX: 'wa:test:' + randomUUID(),
-    RATE_LIMIT_IP_LIMIT: 100, RATE_LIMIT_USER_LIMIT: 100, RATE_LIMIT_WINDOW_MS: 3600000,
-    ...overrides,
-  };
-  await migrate(base.DATABASE_URL);
-  const module = await Test.createTestingModule({ imports: [AppModule] })
-    .overrideProvider(ConfigService).useValue(new ConfigService(settings)).compile();
-  const app = module.createNestApplication({ logger: false });
-  await app.listen(0, '127.0.0.1');
-  const database = app.get(DatabaseService);
-  const redis = new Redis(base.REDIS_URL, { maxRetriesPerRequest: 1 });
-  redis.on('error', () => {});
-  const request = (url: string, token?: string, body?: unknown, headers: Record<string, string> = {}) =>
-    fetch(app.getHttpServer().address() ? 'http://127.0.0.1:' + (app.getHttpServer().address() as AddressInfo).port + url : '', {
-      method: body === undefined ? 'GET' : 'POST',
-      headers: { ...(token ? { Authorization: 'Bearer ' + token } : {}), 'Content-Type': 'application/json', ...headers },
-      body: body === undefined ? undefined : JSON.stringify(body),
+  cleanup.add(async () => {
+    provider.closeAllConnections();
+    if (provider.listening) await new Promise<void>((resolve, reject) => provider.close((error) => error ? reject(error) : resolve()));
+  });
+  try {
+    await new Promise<void>((resolve, reject) => {
+      provider.once('error', reject);
+      provider.listen(0, '127.0.0.1', resolve);
     });
+    const base = validateEnvironment(process.env);
+    assert(['localhost', '127.0.0.1'].includes(new URL(base.DATABASE_URL).hostname), 'Use local test PostgreSQL only');
+    const settings = {
+      ...base, NODE_ENV: 'test',
+      SUPABASE_URL: 'http://127.0.0.1:' + (provider.address() as AddressInfo).port,
+      SUPABASE_PUBLISHABLE_KEY: 'test-publishable-key',
+      RATE_LIMIT_PREFIX: 'wa:test:' + randomUUID(),
+      RATE_LIMIT_IP_LIMIT: 100, RATE_LIMIT_USER_LIMIT: 100, RATE_LIMIT_WINDOW_MS: 3600000,
+      ...overrides,
+    };
+    await migrate(base.DATABASE_URL);
+    const module = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(ConfigService).useValue(new ConfigService(settings)).compile();
+    const app = module.createNestApplication({ logger: false });
+    cleanup.add(() => app.close());
+    await app.listen(0, '127.0.0.1');
+    const database = app.get(DatabaseService);
+    const redis = new Redis(base.REDIS_URL, { maxRetriesPerRequest: 1, commandTimeout: 3000 });
+    cleanup.add(() => redis.disconnect());
+    redis.on('error', () => {});
+    const request = (url: string, token?: string, body?: unknown, headers: Record<string, string> = {}) =>
+      fetch(app.getHttpServer().address() ? 'http://127.0.0.1:' + (app.getHttpServer().address() as AddressInfo).port + url : '', {
+        method: body === undefined ? 'GET' : 'POST',
+        headers: { ...(token ? { Authorization: 'Bearer ' + token } : {}), 'Content-Type': 'application/json', ...headers },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
 
-  return {
-    identities, request, database, get providerCalls() { return providerCalls; },
-    async close() {
-      try {
-        await database.query(`DELETE FROM app.businesses WHERE created_by IN
-          (SELECT id FROM app.users WHERE auth_user_id = ANY($1::uuid[]))`, [Object.values(identities)]);
-        await database.query('DELETE FROM app.users WHERE auth_user_id = ANY($1::uuid[])', [Object.values(identities)]);
-        let cursor = '0';
-        do {
-          const scan = await redis.scan(cursor, 'MATCH', settings.RATE_LIMIT_PREFIX + ':*', 'COUNT', 100);
-          cursor = scan[0];
-          if (scan[1].length) await redis.del(...scan[1]);
-        } while (cursor !== '0');
-      } finally {
-        redis.disconnect();
-        await app.close();
-        provider.closeAllConnections();
-        await new Promise<void>((resolve) => provider.close(() => resolve()));
-      }
-    },
-  };
+    return {
+      identities, request, database, get providerCalls() { return providerCalls; },
+      async close() {
+        try {
+          await database.query(`DELETE FROM app.businesses WHERE created_by IN
+            (SELECT id FROM app.users WHERE auth_user_id = ANY($1::uuid[]))`, [Object.values(identities)]);
+          await database.query('DELETE FROM app.users WHERE auth_user_id = ANY($1::uuid[])', [Object.values(identities)]);
+        } finally {
+          try {
+            let cursor = '0';
+            do {
+              const scan = await redis.scan(cursor, 'MATCH', settings.RATE_LIMIT_PREFIX + ':*', 'COUNT', 100);
+              cursor = scan[0];
+              if (scan[1].length) await redis.del(...scan[1]);
+            } while (cursor !== '0');
+          } finally { await cleanup.close(); }
+        }
+      },
+    };
+  } catch (error) { return cleanup.failed(error); }
 }
+
+test('failed initialization fixture probe', { skip: !process.env.WA_FIXTURE_FAILURE_PROBE }, async () => {
+  await assert.rejects(fixture({ DATABASE_URL: 'postgresql://test:test@127.0.0.1:1/test' }), { code: 'ECONNREFUSED' });
+});
+
+test('failed fixture initialization releases sockets and exits without forced shutdown', { timeout: 20000 }, () => {
+  const env: NodeJS.ProcessEnv = { ...process.env, WA_FIXTURE_FAILURE_PROBE: '1' };
+  delete env.NODE_TEST_CONTEXT;
+  const result = spawnSync(process.execPath, ['--require', 'ts-node/register', '--test',
+    '--test-name-pattern=^failed initialization fixture probe$', __filename], {
+    env, encoding: 'utf8', timeout: 15000,
+  });
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /ok 1 - failed initialization fixture probe/);
+});
 
 test('sessions, memberships, and business data remain isolated', { timeout: 30000 }, async () => {
   const context = await fixture();

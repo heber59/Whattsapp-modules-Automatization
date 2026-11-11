@@ -10,7 +10,7 @@ async function bootstrap() {
   const config = app.get(ConfigService);
   const docsEnabled = configureHttp(app);
   app.enableShutdownHooks();
-  await app.listen(config.getOrThrow<number>('PORT'), '127.0.0.1');
+  await app.listen(config.getOrThrow<number>('PORT'), config.getOrThrow<string>('HTTP_HOST'));
   const url = await app.getUrl();
   if (docsEnabled) Logger.log(`Swagger available at ${url}/docs`, 'Bootstrap');
 }

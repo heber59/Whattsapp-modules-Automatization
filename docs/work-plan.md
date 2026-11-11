@@ -1,37 +1,28 @@
 # Work plan
 
-Reference: the Whattsapp Automatization HTML checklist. Target dates: Friday November 6 and Saturday November 7, 2026; Sunday November 8 off; conditional release on Monday November 9.
+Reviewed November 11, 2026. Delivery follows dependencies and acceptance evidence. The previous November 6–9 targets are retired; the unavailable HTML checklist is no longer a planning dependency.
 
-| Block | HTML | Deliverable and completion |
-| --- | --- | --- |
-| 1. Scope and access | f1–f2 | Pilot defined; Meta access verified or blockers recorded. |
-| 2. Executable foundation | f3 | Workspace, frontend, API, worker, local services; startup/build checked. Selective CI, deployment pending. |
-| 3. Data and access | f4–f5 | Migrations, authentication, roles, isolation tested between businesses. |
-| 4. Async channel | f6–f7 | Signed webhook, inbox/outbox, retries, recovery. |
-| 5. First journey | f8–f10 | Configurable graph, editor, unique COP order confirmation. |
-| 6. Complete product | s2–s5 | Remaining nodes, versions, simulator, human inbox. |
-| 7. Validate candidate | s6–s12 | Security, concurrency, infrastructure, restoration, internal acceptance. |
-| 8. Pilot | m1–m7 | Acceptance, controlled deployment, live validation, agreed payment. |
+## Delivery sequence
 
-f11 closes Friday; s1 reviews blockers and adjusts Saturday. Meta approval and commercial acceptance are not assumed.
+Owner roles identify areas of responsibility. Rows describe dependencies; independent preparation may run in parallel.
 
-## Foundation
-- pnpm workspaces: apps/web, apps/api, packages/contracts.
-- Next.js App Router initial screen; editor and frontend authentication pending.
-- NestJS health endpoint for PostgreSQL/Redis and a separate diagnostic worker.
-- Local PostgreSQL/Redis through Docker Compose.
-- Environment examples without production credentials.
-- Build, type checking, focused unit tests, API/worker end-to-end flows.
-
-The initial migration covers identity, businesses, phone numbers, and products. Meta, orders, and commercial workflows remain pending. CI is configured; review the relevant MR run. Deployment awaits hosting; React Flow belongs to the editor block.
+| Delivery | Status | Owner role | Blocker and next action | Acceptance evidence |
+| --- | --- | --- | --- | --- |
+| Reproducible foundation | Locally verified | Engineering / QA | Record the candidate commit and CI run. | Lint, types, five CI tests, two configuration tests, nine integration tests, and API/web builds passed locally before publication. |
+| Hosting topology | HTTP configuration prepared locally; ingress pending | Infrastructure | Select ingress, process topology, and provider; validate bind address and trusted proxies accordingly. | Reachable API and correct client IP limits through the selected ingress; forwarding headers from untrusted peers are ignored. |
+| Merchant session and permissions | Partial | Frontend / backend | Decide session handling and administrative permissions; implement the missing lifecycle. | Login, refresh, recovery, sign-out, business isolation, and role restrictions; real Supabase acceptance recorded separately. |
+| Persistent WhatsApp channel | Pending | Integration / backend | Obtain Meta access and HTTPS endpoint; implement signed reception and durable processing. | Invalid signatures rejected; repeated delivery creates one event; messages survive retry and recovery. |
+| Configurable first order | Pending | Product / frontend / backend | Approve initial node catalog and required order fields; build editor, versioned execution, and orders. | Merchant builds from an empty canvas; customer confirms exactly one order with server-calculated COP totals. |
+| Release candidate and pilot | Pending | QA / operations / pilot lead | Complete the journey, resilience checks, and pilot agreement. | Recorded recovery checks, real-provider journey, deployment validation, and explicit pilot acceptance. |
 
 ## Tracking
-Pending → In progress → Implemented → Verified. Record blockers with an owner and next action. Evidence, not the calendar, verifies completion.
 
-## Local evidence
-Types, builds, unit tests, and separate API/worker flows passed. Additional compiled-process checks covered HTTP responses, real worker jobs, Redis outage responses, and recovery. Temporary checks were removed. Delivery artifacts are configured; no deployment has occurred.
+Use Pending → In progress → Implemented → Verified. Each change records its owner, blocker, next action, candidate commit, and test or CI evidence. A configured integration is not verified until acceptance succeeds. Recheck evidence after relevant implementation changes.
 
-## Data and access progress
-Local migrations, profiles, memberships, isolation, and IP/user/account buckets are implemented and tested. Automated tests simulate Supabase; the local environment connects to the real Auth project. CAPTCHA/MFA configuration and frontend access remain pending. Billing scope is undecided. See database.md and authentication-security.md.
+Current implementation includes local API/web/worker processes, migrations, identity, memberships, business isolation, and IP/user/account limits. The worker processes diagnostic jobs. Frontend authentication, Meta integration, workflow execution, orders, and commercial workflows remain pending. See [backend](backend.md), [authentication](authentication-security.md), and [delivery](ci-cd.md).
 
-POST /auth/login returns access_token for HTTP clients and applies IP/account limits. Automated login tests use a controlled provider; a real-user login still requires manual validation.
+Historical temporary checks reported Redis outage/recovery behavior; those checks were removed and are not retained regression coverage. Automated authentication tests use a simulated provider. Real-user Supabase login, Meta acceptance, production deployment, and artifact execution remain unverified.
+
+## Product scope
+
+The first journey must preserve freely configurable graphs within the supported node catalog. Initial nodes and order fields are proposals until approved. Broader nodes, simulation, human inbox, and commercial administration follow explicit acceptance needs; they are not implied complete by the first order.
