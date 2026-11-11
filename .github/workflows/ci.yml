@@ -104,6 +104,7 @@ jobs:
       - run: pnpm --filter @wa/web lint
       - run: pnpm --filter @wa/web typecheck
       - run: pnpm --filter @wa/web build
+      - run: pnpm --filter @wa/web test:e2e
       - name: Prepare delivery
         if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
         run: pnpm package:web

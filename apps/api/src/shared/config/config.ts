@@ -33,6 +33,7 @@ const environmentSchema = z.object({
   REDIS_URL: urlWithProtocols(['redis:', 'rediss:']),
   SUPABASE_URL: optionalText,
   SUPABASE_PUBLISHABLE_KEY: optionalText,
+  WEB_AUTH_SECRET: z.preprocess((value) => value === '' ? undefined : value, z.string().min(32).max(512).optional()),
   RATE_LIMIT_IP_LIMIT: z.coerce.number().int().min(1).max(100000).default(120),
   RATE_LIMIT_LOGIN_ACCOUNT_LIMIT: z.coerce.number().int().min(1).max(1000).default(5),
   RATE_LIMIT_USER_LIMIT: z.coerce.number().int().min(1).max(100000).default(60),

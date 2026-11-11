@@ -45,6 +45,6 @@ Start, message/menu, validated input, condition, variable, catalog/cart, order, 
 
 ## Current state
 
-Local frontend, API, and worker, with PostgreSQL and Redis through Docker Compose. Identity and business endpoints use Supabase Auth and independent IP/user limits. POST /auth/login supports testing through HTTP clients. The frontend login, workflow editor, orders, and Meta integration remain pending.
+Local frontend, API, and worker, with PostgreSQL and Redis through Docker Compose. Identity and business endpoints use Supabase Auth and independent IP/user limits. POST /auth/login supports testing through HTTP clients. Merchants can sign in through the web, create or open a business, and sign out. Workflow editing, orders, and Meta integration remain pending.
 
 CI selects affected services and runs ESLint and security checks. Delivery artifacts are prepared; deployment awaits a hosting decision.
