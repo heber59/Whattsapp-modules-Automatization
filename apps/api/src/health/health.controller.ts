@@ -3,16 +3,16 @@ import { ApiOkResponse, ApiOperation, ApiServiceUnavailableResponse, ApiTags, Ap
 import { Public } from '../shared/auth/auth.decorators';
 import { HealthService } from './health.service';
 
-@ApiTags('Estado')
+@ApiTags('Health')
 @Controller('health')
 export class HealthController {
   constructor(private readonly health: HealthService) {}
 
   @Public()
   @Get()
-  @ApiOperation({ summary: 'Comprobar PostgreSQL y Redis', security: [] })
+  @ApiOperation({ summary: 'Check PostgreSQL and Redis', security: [] })
   @ApiOkResponse({
-    description: 'Ambas dependencias responden.',
+    description: 'Both dependencies are responding.',
     schema: {
       type: 'object', required: ['status', 'services'],
       properties: {
@@ -24,8 +24,8 @@ export class HealthController {
       },
     },
   })
-  @ApiServiceUnavailableResponse({ description: 'Una dependencia no responde o falla el control de acceso.' })
-  @ApiTooManyRequestsResponse({ description: 'Límite por IP alcanzado. Reintentar según Retry-After.' })
+  @ApiServiceUnavailableResponse({ description: 'A dependency is unavailable or access control failed.' })
+  @ApiTooManyRequestsResponse({ description: 'IP limit reached. Retry according to Retry-After.' })
   async check() {
     const result = await this.health.check();
     if (result.status !== 'ok') throw new ServiceUnavailableException(result);

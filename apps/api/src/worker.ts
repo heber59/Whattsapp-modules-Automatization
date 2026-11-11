@@ -9,6 +9,6 @@ async function bootstrap() {
 }
 
 void bootstrap().catch(() => {
-  Logger.error('No se pudo iniciar el worker. Revisa configuración y Redis.', 'Bootstrap');
+  Logger.error('Could not start the worker. Check configuration and Redis.', 'Bootstrap');
   process.exit(1);
 });

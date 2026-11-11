@@ -7,14 +7,14 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { affected } from './affected.mjs';
 
-test('documentación no ejecuta servicios; frontend no ejecuta backend', () => {
+test('documentation does not run services; frontend changes do not run the backend', () => {
   assert(Object.values(affected(['README.md', 'docs/backend.md', '.ai'])).every((value) => !value));
   const result = affected(['apps/web/src/app/page.tsx']);
   assert(result.web && result.audit);
   assert(!result.api && !result.worker && !result.contracts);
 });
 
-test('separación de API y worker, incluyendo eliminación y cambios compartidos', () => {
+test('API and worker selection includes deletions and shared changes', () => {
   const api = affected(['apps/api/src/health/health.service.ts']);
   assert(api.api && !api.worker && !api.web);
   const auth = affected(['apps/api/src/shared/auth/access.guard.ts', 'apps/api/test/security.e2e-spec.ts', 'apps/api/src/modules/auth/auth.service.ts']);
@@ -25,7 +25,7 @@ test('separación de API y worker, incluyendo eliminación y cambios compartidos
   assert(shared.api && shared.worker && !shared.web);
 });
 
-test('contratos y configuración global incluyen sus consumidores', () => {
+test('contracts and global configuration include their consumers', () => {
   for (const file of ['packages/contracts/src/index.ts', 'pnpm-lock.yaml']) {
     const result = affected([file]);
     assert(result.web && result.api && result.worker && result.contracts);
@@ -33,14 +33,14 @@ test('contratos y configuración global incluyen sus consumidores', () => {
   assert(Object.values(affected(['.github/workflows/ci.yml'])).every(Boolean));
 });
 
-test('infraestructura local afecta backend; varios cambios acumulan servicios', () => {
+test('local infrastructure affects the backend; multiple changes accumulate services', () => {
   const infra = affected(['compose.yaml']);
   assert(infra.api && infra.worker && !infra.web);
   const mixed = affected(['apps/api/src/main.ts', 'apps/web/next.config.mjs']);
   assert(mixed.api && mixed.web && !mixed.worker);
 });
 
-test('el detector CLI usa el historial y escribe salidas de GitHub Actions', () => {
+test('the detector CLI reads Git history and writes GitHub Actions outputs', () => {
   const directory = mkdtempSync(path.join(tmpdir(), 'wa-affected-'));
   const git = (...args) => execFileSync('git', args, { cwd: directory, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
   const commit = () => {
@@ -51,7 +51,7 @@ test('el detector CLI usa el historial y escribe salidas de GitHub Actions', () 
   };
   try {
     git('init');
-    writeFileSync(path.join(directory, 'README.md'), 'inicio');
+    writeFileSync(path.join(directory, 'README.md'), 'initial');
     const base = commit();
     mkdirSync(path.join(directory, 'apps/web/src'), { recursive: true });
     writeFileSync(path.join(directory, 'apps/web/src/page.tsx'), 'frontend');

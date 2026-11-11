@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   changes:
-    name: Detectar cambios
+    name: Detect changes
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -33,17 +33,17 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version-file: .nvmrc
-      - name: Probar reglas de selección
+      - name: Test change selection
         run: node --test scripts/ci/affected.spec.mjs
       - id: affected
-        name: Seleccionar servicios afectados
+        name: Select affected services
         env:
           DIFF_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
           DIFF_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
         run: node scripts/ci/affected.mjs
 
   tooling:
-    name: Herramientas
+    name: Tooling
     needs: changes
     if: needs.changes.outputs.tooling == 'true'
     runs-on: ubuntu-latest
@@ -59,7 +59,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec eslint scripts/ci eslint.config.mjs
-      - name: Validar workflows
+      - name: Validate workflows
         run: >-
           docker run --rm
           --volume "$GITHUB_WORKSPACE:/repo:ro"
@@ -67,7 +67,7 @@ jobs:
           rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 -color
 
   contracts:
-    name: Contratos
+    name: Contracts
     needs: changes
     if: needs.changes.outputs.contracts == 'true'
     runs-on: ubuntu-latest
@@ -104,7 +104,7 @@ jobs:
       - run: pnpm --filter @wa/web lint
       - run: pnpm --filter @wa/web typecheck
       - run: pnpm --filter @wa/web build
-      - name: Preparar entrega
+      - name: Prepare delivery
         if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
         run: pnpm package:web
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -164,7 +164,7 @@ jobs:
       - run: pnpm --filter @wa/api test
       - run: pnpm --filter @wa/api test:e2e:api
       - run: pnpm --filter @wa/api build
-      - name: Preparar entrega
+      - name: Prepare delivery
         if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
         run: pnpm package:api
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -211,7 +211,7 @@ jobs:
       - run: pnpm --filter @wa/api test
       - run: pnpm --filter @wa/api test:e2e:worker
       - run: pnpm --filter @wa/api build
-      - name: Preparar entrega
+      - name: Prepare delivery
         if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
         run: pnpm package:worker
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -223,7 +223,7 @@ jobs:
           retention-days: 7
 
   audit:
-    name: Vulnerabilidades de dependencias
+    name: Dependency vulnerabilities
     needs: changes
     if: needs.changes.outputs.audit == 'true'
     runs-on: ubuntu-latest
@@ -241,17 +241,17 @@ jobs:
       - run: pnpm audit --audit-level=high
 
   result:
-    name: Resultado
+    name: Result
     needs: [changes, tooling, contracts, web, api, worker, audit]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: Comprobar resultados
+      - name: Check results
         env:
           RESULTS: ${{ join(needs.*.result, ',') }}
         run: |
           case "$RESULTS" in
-            *failure*|*cancelled*) echo "Hay verificaciones fallidas o canceladas"; exit 1 ;;
-            *) echo "Verificaciones aprobadas; los servicios no afectados fueron omitidos" ;;
+            *failure*|*cancelled*) echo "Some checks failed or were cancelled"; exit 1 ;;
+            *) echo "Checks passed; unaffected services were skipped" ;;
           esac

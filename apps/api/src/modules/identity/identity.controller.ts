@@ -4,23 +4,23 @@ import { CurrentUser } from '../../shared/auth/auth.decorators';
 import type { Principal } from '../../shared/auth/auth.types';
 import { IdentityService } from './identity.service';
 
-@ApiTags('Identidad')
+@ApiTags('Identity')
 @ApiBearerAuth('supabase')
-@ApiUnauthorizedResponse({ description: 'Sesión ausente, inválida o anónima.' })
-@ApiTooManyRequestsResponse({ description: 'Límite por IP o usuario alcanzado; consultar Retry-After.' })
-@ApiServiceUnavailableResponse({ description: 'Autenticación sin configurar o dependencia no disponible.' })
+@ApiUnauthorizedResponse({ description: 'Missing, invalid, or anonymous session.' })
+@ApiTooManyRequestsResponse({ description: 'IP or user limit reached; check Retry-After.' })
+@ApiServiceUnavailableResponse({ description: 'Authentication is not configured or a dependency is unavailable.' })
 @Controller('identity')
 export class IdentityController {
   constructor(private readonly identity: IdentityService) {}
 
   @Get('me')
-  @ApiOperation({ summary: 'Consultar y sincronizar mi perfil', description: 'La identidad se obtiene de Supabase, no de parámetros enviados por el cliente.' })
+  @ApiOperation({ summary: 'Get and synchronize my profile', description: 'Identity comes from Supabase, not from client-supplied parameters.' })
   @ApiOkResponse({
     schema: {
       type: 'object', required: ['id', 'auth_user_id', 'email'],
       properties: {
-        id: { type: 'string', format: 'uuid', description: 'ID interno de la aplicación.' },
-        auth_user_id: { type: 'string', format: 'uuid', description: 'ID de Supabase Auth.' },
+        id: { type: 'string', format: 'uuid', description: 'Internal application ID.' },
+        auth_user_id: { type: 'string', format: 'uuid', description: 'Supabase Auth ID.' },
         email: { type: 'string', format: 'email', nullable: true },
       },
     },

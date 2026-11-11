@@ -9,7 +9,7 @@ import Redis from 'ioredis';
 import { WorkerModule } from '../src/worker.module';
 import { SYSTEM_PING, SYSTEM_QUEUE } from '../src/shared/queue/queue.constants';
 
-test('el worker procesa un trabajo real sin iniciar la API ni PostgreSQL', { timeout: 20000 }, async () => {
+test('the worker processes a real job without starting the API or PostgreSQL', { timeout: 20000 }, async () => {
   const worker = await NestFactory.createApplicationContext(WorkerModule, { logger: false, abortOnError: false });
   const redisUrl = worker.get(ConfigService).getOrThrow<string>('REDIS_URL');
   const producer = new Redis(redisUrl, { maxRetriesPerRequest: 1 });

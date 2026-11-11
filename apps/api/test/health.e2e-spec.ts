@@ -21,7 +21,7 @@ async function createApp(mode: 'test' | 'production') {
   return app;
 }
 
-test('API saludable, Swagger navegable y rutas privadas protegidas', { timeout: 15000 }, async () => {
+test('API health, Swagger navigation, and protected private routes', { timeout: 15000 }, async () => {
   const app = await createApp('test');
   try {
     const base = await app.getUrl();
@@ -52,7 +52,7 @@ test('API saludable, Swagger navegable y rutas privadas protegidas', { timeout: 
   } finally { await app.close(); }
 });
 
-test('Swagger y redirección no se exponen en producción', { timeout: 15000 }, async () => {
+test('Swagger and root redirect are disabled in production', { timeout: 15000 }, async () => {
   const app = await createApp('production');
   try {
     const base = await app.getUrl();

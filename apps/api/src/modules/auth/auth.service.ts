@@ -15,7 +15,7 @@ export class AuthService {
 
   async login(input: unknown) {
     const parsed = credentials.safeParse(input);
-    if (!parsed.success) throw new BadRequestException('Se requieren correo y contraseña válidos');
+    if (!parsed.success) throw new BadRequestException('Valid email and password are required');
     const { email, password, captchaToken } = parsed.data;
     const retryAfter = await this.limiter.consume('account', email);
     if (retryAfter) return { status: 'limited' as const, retryAfter };

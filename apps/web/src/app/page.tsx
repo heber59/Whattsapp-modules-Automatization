@@ -2,14 +2,14 @@ export default function HomePage() {
   return (
     <main>
       <span className="eyebrow">Whattsapp Automatization</span>
-      <h1>Tus pedidos, en orden.</h1>
-      <p>Estamos construyendo una forma de organizar pedidos por WhatsApp
-        con conversaciones configurables y atención humana cuando se necesita.</p>
-      <div className="status">Proyecto en desarrollo</div>
+      <h1>Your orders, organized.</h1>
+      <p>We are building a way to manage WhatsApp orders through configurable
+        conversations, with human support whenever it is needed.</p>
+      <div className="status">Project in development</div>
       <section aria-labelledby="next-step">
-        <h2 id="next-step">Primer paso: una base sólida</h2>
-        <p>La gestión de pedidos, el editor de flujos y la conexión con WhatsApp
-          se habilitarán en las próximas etapas.</p>
+        <h2 id="next-step">First step: a solid foundation</h2>
+        <p>Order management, the workflow editor, and the WhatsApp connection
+          will become available in the next stages.</p>
       </section>
     </main>
   );

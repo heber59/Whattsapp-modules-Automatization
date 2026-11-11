@@ -15,7 +15,7 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
       maxRetriesPerRequest: 1,
       retryStrategy: (attempt) => Math.min(attempt * 250, 3000),
     });
-    this.client.on('error', () => this.logger.warn('Redis no está disponible'));
+    this.client.on('error', () => this.logger.warn('Redis is unavailable'));
   }
 
   async ping(): Promise<void> {

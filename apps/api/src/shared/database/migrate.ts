@@ -24,7 +24,7 @@ export async function migrate(connectionString: string): Promise<void> {
         'SELECT checksum FROM app.schema_migrations WHERE version = $1', [version],
       );
       if (existing.rows[0]) {
-        if (existing.rows[0].checksum !== checksum) throw new Error('Migración aplicada fue modificada: ' + version);
+        if (existing.rows[0].checksum !== checksum) throw new Error('Applied migration was modified: ' + version);
         continue;
       }
       await client.query('BEGIN');
@@ -52,9 +52,9 @@ if (require.main === module) {
   void (async () => {
     const config = validateEnvironment(process.env);
     await migrate(config.DATABASE_URL);
-    console.log('Migraciones al día');
+    console.log('Migrations are up to date');
   })().catch(() => {
-    console.error('No se aplicaron las migraciones. Revisa conexión, permisos e historial.');
+    console.error('Migrations could not be applied. Check connection, permissions, and migration history.');
     process.exitCode = 1;
   });
 }

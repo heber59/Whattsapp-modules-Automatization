@@ -1,4 +1,4 @@
-name: Seguridad
+name: Security
 on:
   pull_request:
     branches: [develop, main]
@@ -53,7 +53,7 @@ jobs:
           category: javascript-typescript
 
   scheduled-audit:
-    name: Auditoría periódica de dependencias
+    name: Scheduled dependency audit
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 10

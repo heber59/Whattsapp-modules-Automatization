@@ -46,7 +46,7 @@ export class RateLimitService implements OnModuleDestroy {
         this.config.getOrThrow<number>('RATE_LIMIT_WINDOW_MS')) as [number, number];
       return result[0] === 1 ? 0 : Math.max(1, Math.ceil(result[1] / 1000));
     } catch {
-      throw new ServiceUnavailableException('Control de acceso temporalmente no disponible');
+      throw new ServiceUnavailableException('Access control is temporarily unavailable');
     }
   }
 

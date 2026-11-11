@@ -4,12 +4,12 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Whattsapp Automatization',
-  description: 'Automatización de pedidos por WhatsApp para comercios colombianos.',
+  description: 'WhatsApp order automation for Colombian businesses.',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="es">
+    <html lang="en">
       <body>{children}</body>
     </html>
   );

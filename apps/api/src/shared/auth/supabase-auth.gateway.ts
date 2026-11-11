@@ -11,8 +11,8 @@ export class SupabaseAuthGateway {
   private client() {
     const url = this.config.get<string>('SUPABASE_URL');
     const key = this.config.get<string>('SUPABASE_PUBLISHABLE_KEY');
-    if (!url || !key) throw new ServiceUnavailableException('Autenticación pendiente de configuración');
-    // Cliente por operación: ninguna sesión se comparte entre usuarios.
+    if (!url || !key) throw new ServiceUnavailableException('Authentication configuration is pending');
+    // One client per operation: sessions are never shared between users.
     return createClient(url, key, {
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
       global: { fetch: (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(3000) }) },
@@ -21,7 +21,7 @@ export class SupabaseAuthGateway {
 
   private unavailable(status?: number): void {
     if (!status || status === 429 || status >= 500) {
-      throw new ServiceUnavailableException('Autenticación temporalmente no disponible');
+      throw new ServiceUnavailableException('Authentication is temporarily unavailable');
     }
   }
 
@@ -29,10 +29,10 @@ export class SupabaseAuthGateway {
     const { data, error } = await this.client().auth.getUser(token);
     if (error) {
       this.unavailable(error.status);
-      throw new UnauthorizedException('Sesión no válida');
+      throw new UnauthorizedException('Invalid session');
     }
     if (!data.user || data.user.is_anonymous || !z.uuid().safeParse(data.user.id).success) {
-      throw new UnauthorizedException('Sesión no válida');
+      throw new UnauthorizedException('Invalid session');
     }
     return { subject: data.user.id, email: data.user.email ?? null };
   }
@@ -43,9 +43,9 @@ export class SupabaseAuthGateway {
     });
     if (error) {
       this.unavailable(error.status);
-      throw new UnauthorizedException('Correo o contraseña no válidos');
+      throw new UnauthorizedException('Invalid email or password');
     }
-    if (!data.session) throw new UnauthorizedException('Correo o contraseña no válidos');
+    if (!data.session) throw new UnauthorizedException('Invalid email or password');
     return {
       access_token: data.session.access_token,
       token_type: data.session.token_type,

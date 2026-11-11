@@ -13,43 +13,43 @@ const businessSchema = {
   },
 };
 
-@ApiTags('Negocios')
+@ApiTags('Businesses')
 @ApiBearerAuth('supabase')
-@ApiUnauthorizedResponse({ description: 'Se requiere una sesión válida de Supabase.' })
-@ApiTooManyRequestsResponse({ description: 'Límite por IP o usuario alcanzado; consultar Retry-After.' })
-@ApiServiceUnavailableResponse({ description: 'Autenticación sin configurar o dependencia no disponible.' })
+@ApiUnauthorizedResponse({ description: 'A valid Supabase session is required.' })
+@ApiTooManyRequestsResponse({ description: 'IP or user limit reached; check Retry-After.' })
+@ApiServiceUnavailableResponse({ description: 'Authentication is not configured or a dependency is unavailable.' })
 @Controller('businesses')
 export class BusinessesController {
   constructor(private readonly businesses: BusinessesService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Crear un negocio', description: 'Crea también la membresía owner del usuario autenticado, en una transacción.' })
+  @ApiOperation({ summary: 'Create a business', description: 'Also creates the authenticated user as an owner member in the same transaction.' })
   @ApiBody({
     required: true,
     schema: {
       type: 'object', required: ['name'], additionalProperties: false,
-      properties: { name: { type: 'string', minLength: 1, maxLength: 100, example: 'Mi comercio' } },
+      properties: { name: { type: 'string', minLength: 1, maxLength: 100, example: 'My store' } },
     },
   })
-  @ApiCreatedResponse({ description: 'Negocio y membresía creados.', schema: businessSchema })
-  @ApiBadRequestResponse({ description: 'Nombre vacío o inválido, o campos adicionales no permitidos.' })
+  @ApiCreatedResponse({ description: 'Business and membership created.', schema: businessSchema })
+  @ApiBadRequestResponse({ description: 'Empty or invalid name, or unsupported additional fields.' })
   create(@CurrentUser() user: Principal, @Body() input: unknown) {
     return this.businesses.create(user, input);
   }
 
   @Get()
-  @ApiOperation({ summary: 'Listar mis negocios', description: 'Devuelve únicamente negocios donde el usuario tiene membresía.' })
+  @ApiOperation({ summary: 'List my businesses', description: 'Returns only businesses where the current user has a membership.' })
   @ApiOkResponse({ schema: { type: 'array', items: businessSchema } })
   list(@CurrentUser() user: Principal) {
     return this.businesses.list(user);
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Consultar uno de mis negocios' })
-  @ApiParam({ name: 'id', type: String, format: 'uuid', description: 'UUID v4 del negocio.' })
+  @ApiOperation({ summary: 'Get one of my businesses' })
+  @ApiParam({ name: 'id', type: String, format: 'uuid', description: 'Business UUID v4.' })
   @ApiOkResponse({ schema: businessSchema })
-  @ApiBadRequestResponse({ description: 'El ID no es un UUID v4 válido.' })
-  @ApiNotFoundResponse({ description: 'El negocio no existe o el usuario no tiene membresía.' })
+  @ApiBadRequestResponse({ description: 'The ID is not a valid UUID v4.' })
+  @ApiNotFoundResponse({ description: 'The business does not exist or the current user has no membership.' })
   find(@CurrentUser() user: Principal, @Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
     return this.businesses.find(user, id);
   }

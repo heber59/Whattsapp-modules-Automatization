@@ -16,7 +16,7 @@ export class AccessGuard implements CanActivate {
   private reject(context: ExecutionContext, retry: number): never {
     context.switchToHttp().getResponse<{ setHeader(name: string, value: string): void }>()
       .setHeader('Retry-After', String(retry));
-    throw new HttpException('Demasiadas solicitudes; inténtalo más tarde', HttpStatus.TOO_MANY_REQUESTS);
+    throw new HttpException('Too many requests; try again later', HttpStatus.TOO_MANY_REQUESTS);
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -26,7 +26,7 @@ export class AccessGuard implements CanActivate {
     if (this.reflector.getAllAndOverride<boolean>(PUBLIC_ROUTE, [context.getHandler(), context.getClass()])) return true;
     const header = request.headers.authorization;
     const match = typeof header === 'string' ? /^Bearer ([^\s]+)$/i.exec(header) : null;
-    if (!match?.[1] || match[1].length > 8192) throw new UnauthorizedException('Sesión no válida');
+    if (!match?.[1] || match[1].length > 8192) throw new UnauthorizedException('Invalid session');
     request.user = await this.gateway.verify(match[1]);
     const userRetry = await this.limiter.consume('user', request.user.subject);
     if (userRetry) this.reject(context, userRetry);
