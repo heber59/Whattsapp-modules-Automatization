@@ -15,6 +15,7 @@ async function listen(server) {
 test('merchant cookies survive reload, renew, isolate businesses and clear on logout', { timeout: 30000 }, async (t) => {
   const key = randomUUID();
   const businesses = new Map();
+  const profiles = new Map();
   const current = new Map();
   const sessions = new Map();
   let renewals = 0;
@@ -70,6 +71,10 @@ test('merchant cookies survive reload, renew, isolate businesses and clear on lo
     }
     const email = current.get(req.headers.authorization?.slice(7));
     if (!email) return send(401, {});
+    if (req.url === '/identity/me') {
+      if (!profiles.has(email)) profiles.set(email, randomUUID());
+      return send(200, { id: profiles.get(email) });
+    }
     const owned = businesses.get(email) ?? [];
     if (req.url === '/businesses' && req.method === 'POST') {
       const business = { id: randomUUID(), name: body.name, role: 'owner' };
@@ -126,10 +131,15 @@ test('merchant cookies survive reload, renew, isolate businesses and clear on lo
     };
   }
   const alice = browser(), bob = browser();
+  assert.equal((await alice('session')).status, 401);
   for (const [client, email] of [[alice, 'alice@example.invalid'], [bob, 'bob@example.invalid']]) {
     const login = await client('session/login', { email, password: 'fixture password' });
     assert(login.ok, 'login status ' + login.status);
     assert.doesNotMatch(await login.text(), /access_token|refresh_token/);
+    const identity = await client('session');
+    assert.equal(identity.status, 200);
+    assert.equal((await identity.json()).id, profiles.get(email));
+    assert.equal(identity.headers.get('cache-control'), 'no-store');
     assert.deepEqual(await (await client('businesses')).json(), []);
   }
   assert.equal((await alice('businesses', { name: 'Unexpected' }, 'https://unrelated.invalid')).status, 403);

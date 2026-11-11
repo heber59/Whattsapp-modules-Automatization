@@ -1,12 +1,14 @@
 'use client';
 
 import Link from 'next/link';
+import { usePortal } from '../portal';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type FormEvent } from 'react';
 
 interface Business { id: string; name: string; role: 'owner' | 'admin' | 'operator' }
 
 export function BusinessArea({ businessId }: { businessId?: string }) {
+  const { t, refresh } = usePortal();
   const router = useRouter();
   const [businesses, setBusinesses] = useState<Business[] | null>(null);
   const [error, setError] = useState('');
@@ -27,18 +29,18 @@ export function BusinessArea({ businessId }: { businessId?: string }) {
           return;
         }
         if (!response.ok) {
-          setError(response.status === 404 ? 'This business is unavailable.' : 'Could not load your businesses. Please try again.');
+          setError(response.status === 404 ? t('This business is unavailable.', 'Este negocio no está disponible.') : t('Could not load your businesses. Please try again.', 'No pudimos cargar tus negocios. Intenta de nuevo.'));
           return;
         }
         const data = await response.json() as Business | Business[];
         if (!controller.signal.aborted) setBusinesses(Array.isArray(data) ? data : [data]);
       } catch {
-        if (!controller.signal.aborted) setError('Could not connect. Check your connection and try again.');
+        if (!controller.signal.aborted) setError(t('Could not connect. Check your connection and try again.', 'No pudimos conectar. Revisa tu conexión e intenta de nuevo.'));
       }
     }
     void load();
     return () => controller.abort();
-  }, [businessId, reload, router]);
+  }, [businessId, reload, router, t]);
 
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -58,13 +60,13 @@ export function BusinessArea({ businessId }: { businessId?: string }) {
         return;
       }
       if (!response.ok) {
-        setError(response.status === 429 ? 'Too many requests. Please try again later.' : 'Could not create the business. Please try again.');
+        setError(response.status === 429 ? t('Too many requests. Please try again later.', 'Demasiadas solicitudes. Intenta más tarde.') : t('Could not create the business. Please try again.', 'No pudimos crear el negocio. Intenta de nuevo.'));
         return;
       }
       const business = await response.json() as Business;
       setBusinesses((current) => [...(current ?? []), business]);
       form.reset();
-    } catch { setError('Could not connect. Check your connection and try again.'); }
+    } catch { setError(t('Could not connect. Check your connection and try again.', 'No pudimos conectar. Revisa tu conexión e intenta de nuevo.')); }
     finally { setPending(false); }
   }
 
@@ -78,44 +80,46 @@ export function BusinessArea({ businessId }: { businessId?: string }) {
       });
       const result = await response.json().catch(() => null) as { authenticated?: boolean } | null;
       if (!response.ok && response.status !== 401 && result?.authenticated !== false) {
-        setError('Could not sign out. Please try again.');
+        setError(t('Could not sign out. Please try again.', 'No pudimos cerrar la sesión. Intenta de nuevo.'));
         return;
       }
       setBusinesses(null);
+      void refresh();
       router.replace(response.ok || response.status === 401 ? '/login' : '/login?session=ended');
       router.refresh();
-    } catch { setError('Could not connect. Please try signing out again.'); }
+    } catch { setError(t('Could not connect. Please try signing out again.', 'No pudimos conectar. Intenta cerrar la sesión de nuevo.')); }
     finally { setPending(false); }
   }
 
   return (
     <main className="account-page">
-      <nav className="account-nav" aria-label="Account">
+      <nav className="account-nav" aria-label={t("Account", "Cuenta")}>
         <Link className="eyebrow" href="/">Whattsapp Automatization</Link>
-        <button className="secondary-button" onClick={() => void logout()} disabled={pending}>Sign out</button>
+        <button className="secondary-button" onClick={() => void logout()} disabled={pending}>{t('Sign out', 'Cerrar sesión')}</button>
       </nav>
-      <h1>{businessId ? 'Your business.' : 'Your businesses.'}</h1>
-      {businessId && <Link href="/businesses">← All businesses</Link>}
+      <p><Link className="button-link" href="/flows">{t("Create a flow", "Crear un flujo")} ↗</Link></p>
+      <h1>{businessId ? t('Your business.', 'Tu negocio.') : t('Your businesses.', 'Tus negocios.')}</h1>
+      {businessId && <Link href="/businesses">{t('← All businesses', '← Todos los negocios')}</Link>}
       {error && <div className="form-feedback" role="alert"><p>{error}</p>
-        {!businesses && <button onClick={() => { setError(''); setReload((value) => value + 1); }}>Try again</button>}
+        {!businesses && <button onClick={() => { setError(''); setReload((value) => value + 1); }}>{t('Try again', 'Intentar de nuevo')}</button>}
       </div>}
-      {!businesses && !error && <p role="status">Loading your account…</p>}
+      {!businesses && !error && <p role="status">{t('Loading your account…', 'Cargando tu cuenta…')}</p>}
       {businesses && <>
         {businessId ? businesses.map((business) => <article className="account-card" key={business.id}>
-          <h2>{business.name}</h2><p>Your role: <strong>{business.role}</strong></p>
+          <h2>{business.name}</h2><p>{t('Your role: ', 'Tu rol: ')}<strong>{t(business.role, ({owner:"propietario",admin:"administrador",operator:"operador"})[business.role])}</strong></p>
         </article>) : <>
-          <p>Choose a business or create one to get started.</p>
-          {businesses.length === 0 ? <p className="empty-state">You have no businesses yet. Create your first one below.</p>
+          <p>{t('Choose a business or create one to get started.', 'Elige un negocio o crea uno para empezar.')}</p>
+          {businesses.length === 0 ? <p className="empty-state">{t('You have no businesses yet. Create your first one below.', 'Aún no tienes negocios. Crea el primero aquí.')}</p>
             : <ul className="business-list">{businesses.map((business) => <li key={business.id}>
               <Link href={`/businesses/${encodeURIComponent(business.id)}`}>
-                <span>{business.name}</span><span className="role-label">{business.role}</span>
+                <span>{business.name}</span><span className="role-label">{t(business.role, ({owner:"propietario",admin:"administrador",operator:"operador"})[business.role])}</span>
               </Link>
             </li>)}</ul>}
           <form className="account-card" onSubmit={create} aria-busy={pending}>
-            <h2>Create a business</h2>
-            <label htmlFor="business-name">Business name</label>
+            <h2>{t('Create a business', 'Crear un negocio')}</h2>
+            <label htmlFor="business-name">{t('Business name', 'Nombre del negocio')}</label>
             <input id="business-name" name="name" autoComplete="organization" required maxLength={100} disabled={pending} />
-            <button type="submit" disabled={pending}>{pending ? 'Please wait…' : 'Create business'}</button>
+            <button type="submit" disabled={pending}>{pending ? t('Please wait…', 'Espera un momento…') : t('Create business', 'Crear negocio')}</button>
           </form>
         </>}
       </>}

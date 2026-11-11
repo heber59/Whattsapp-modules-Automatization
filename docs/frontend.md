@@ -1,6 +1,17 @@
 # Frontend architecture
 
-Next.js App Router + TypeScript + React Flow. Target structure:
+Next.js App Router + TypeScript. The current playground uses SVG; React Flow remains planned.
+
+## Current portal
+
+The shared portal header stays visible across routes with English/Spanish labels and light/dark themes. Preferences persist in browser storage. The landing page explains the project, available tools, intended audience, and planned WhatsApp/order capabilities.
+
+Header and landing calls to action open a native sign-in dialog; /login remains available as a standalone route. /api/session verifies the current profile through the existing server-only authentication proxy. No provider tokens are exposed to the browser.
+
+/flows requires a verified session and provides a large scrollable SVG canvas, step settings, graph validation, and a customer preview. Drafts are stored per application user on the current device; server persistence and publication remain pending. The original shared draft key is left untouched. User-authored text is not changed when switching the interface language.
+
+## Target organization
+
 
 ```text
 apps/web/
@@ -52,11 +63,9 @@ apps/web/
 ## Implementation rules
 - Keep pages small: compose screens and delegate behavior to features.
 - Keep components focused and API operations separate from presentation.
-- Give hooks a purpose; do not turn every function into a hook.
 - Keep specific behavior in its feature. Move it to shared when reuse exists.
 - Dependency direction: app → features → shared. Shared does not import features; avoid cycles.
 - App Router uses app/.../page.tsx. Do not also create src/pages.
 - Default to server components. Use client components for interactions such as React Flow; keep secrets on the server.
 - Separate interface state from remote state; avoid one global store for everything.
 - Place focused unit tests next to the code they verify and end-to-end flows in apps/web/e2e/. Prioritize graph rules, transformations, and critical journeys.
-- Create directories when code needs them; avoid empty placeholders.
