@@ -1,0 +1,12 @@
+packages:
+  - apps/*
+  - packages/*
+
+onlyBuiltDependencies:
+  - '@nestjs/core'
+  - sharp
+  - unrs-resolver
+
+# Fix for GHSA-g3hv-75wg-m249 until upstream tools update their dependency.
+overrides:
+  'minimatch@>=7.0.0 <11.0.1': 11.0.1

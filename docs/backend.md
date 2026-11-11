@@ -1,51 +1,52 @@
-# Arquitectura del backend
+# Backend architecture
 
-Monolito modular en NestJS + TypeScript, con servicios de responsabilidad única y arquitectura hexagonal ligera. Los módulos se comunican mediante operaciones internas, sin llamadas de red entre ellos. El worker ejecuta trabajos asíncronos como proceso separado y reutiliza los módulos.
+A NestJS + TypeScript modular monolith with single-responsibility services and lightweight hexagonal boundaries. Modules communicate through internal operations. A separate worker process reuses modules for background work.
 
-Estructura objetivo:
+Target structure:
 
 ```text
 apps/api/src/
-├── main.ts                         # Entrada HTTP
-├── worker.ts                       # Entrada del proceso de trabajos
-├── app.module.ts                   # Composición de la API
+├── main.ts                         # HTTP entry point
+├── worker.ts                       # Background process entry point
+├── app.module.ts                   # API composition
+├── configure-http.ts               # HTTP and development Swagger setup
 ├── modules/
+│   ├── auth/                       # Login through Supabase Auth
 │   ├── orders/
-│   │   ├── orders.module.ts         # Conecta dependencias y exporta operaciones
-│   │   ├── orders.controller.ts     # Entrada HTTP y respuesta
-│   │   ├── orders.dto.ts            # Contratos y validación de entrada
-│   │   ├── orders.service.ts        # Casos de uso de pedidos
-│   │   ├── orders.rules.ts          # Reglas puras, cuando hagan falta
-│   │   └── orders.repository.ts     # Consultas y persistencia
-│   ├── identity/                   # Usuarios, membresías y permisos
-│   ├── businesses/                 # Configuración del comercio
-│   ├── whatsapp/                   # Conexión Meta, recepción y envío
-│   ├── conversations/              # Historial, estado y transferencia humana
-│   ├── flows/                      # Definición, validación y publicación de grafos
-│   ├── automation/                 # Ejecución de nodos, variables y reanudación
-│   └── catalog/                    # Productos, precios y disponibilidad
+│   │   ├── orders.module.ts         # Wiring and public operations
+│   │   ├── orders.controller.ts     # HTTP input and response
+│   │   ├── orders.dto.ts            # Input contracts and validation
+│   │   ├── orders.service.ts        # Order use cases
+│   │   ├── orders.rules.ts          # Pure rules when needed
+│   │   └── orders.repository.ts     # Queries and persistence
+│   ├── identity/                   # Application user profiles
+│   ├── businesses/                 # Business settings and memberships
+│   ├── whatsapp/                   # Meta connection, receiving, sending
+│   ├── conversations/              # History, state, human handoff
+│   ├── flows/                      # Graph definition and publication
+│   ├── automation/                 # Node execution and resumption
+│   └── catalog/                    # Products, prices, availability
 └── shared/
-    ├── database/                   # Conexión y transacciones
-    ├── queue/                      # Conexión y publicación de trabajos
-    ├── auth/                       # Guards y contexto autenticado del negocio
-    └── config/                     # Configuración validada del entorno
+    ├── database/                   # Connections and transactions
+    ├── queue/                      # Queue infrastructure
+    ├── auth/                       # Guards, rate limits, provider gateway
+    └── config/                     # Validated environment configuration
 ```
 
-## Responsabilidades y dependencias
-- Cada servicio tiene una responsabilidad concreta. Puede incluir varias operaciones relacionadas; no crear una clase por método.
-- Si un servicio mezcla responsabilidades, dividirlo por comportamiento: confirmar pedidos, enviar mensajes o ejecutar nodos.
-- Controllers y consumidores de cola reciben entradas y delegan; no contienen reglas de negocio.
-- Los servicios coordinan casos de uso sin depender de HTTP ni de detalles de Meta, SQL o Redis.
-- Las reglas puras no dependen de NestJS ni de infraestructura.
-- Repositorios y clientes externos concentran persistencia e integraciones.
-- Introducir puertos pequeños en dependencias que requieran aislamiento: Meta, persistencia del motor o publicación de trabajos. Conectarlos mediante inyección en el módulo; evitar interfaces por formalismo.
-- Cada módulo expone operaciones públicas. Otros módulos no acceden a sus tablas ni repositorios; evitar dependencias circulares.
-- Flows define y publica versiones; automation las ejecuta y conserva el estado.
-- Compartir infraestructura en shared; las reglas específicas permanecen en su módulo.
+## Responsibilities and dependencies
+- Give each service one concrete responsibility. Related operations can share a service; avoid one class per method.
+- Split services when they mix behaviors such as confirming orders, sending messages, and executing nodes.
+- Controllers and queue consumers accept input and delegate business work.
+- Use-case services do not depend on transport details or provider internals.
+- Pure business rules do not depend on NestJS or infrastructure.
+- Repositories and external gateways encapsulate persistence and integrations.
+- Introduce small ports where isolation is useful: Meta, execution persistence, or job publication. Wire them through module injection; avoid ceremonial interfaces.
+- Modules expose public operations. Do not access another module's tables or repositories; avoid circular dependencies.
+- Flows defines and publishes versions; automation executes them and persists execution state.
+- Share infrastructure through shared; keep module-specific rules inside their module.
 
-## Validación y pruebas
-- Validar entradas externas, permisos, aislamiento entre negocios e invariantes de negocio. No repetir la misma comprobación en todas las capas.
-- Priorizar integridad de pedidos, grafos válidos, idempotencia y recuperación del worker.
-- Conservar pruebas unitarias específicas y end-to-end de recorridos críticos. Ejecutar las afectadas por cada cambio.
-- Crear archivos y carpetas cuando exista una necesidad real; el árbol no obliga a generar clases vacías.
-
+## Validation and tests
+- Validate external input, permissions, business isolation, and domain invariants without repeating identical checks at every layer.
+- Prioritize order integrity, valid graphs, idempotency, and worker recovery.
+- Keep focused unit tests and critical end-to-end flows. Run affected tests after changes.
+- Create files and directories when needed, without empty placeholder classes.
