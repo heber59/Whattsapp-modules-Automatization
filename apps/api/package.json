@@ -23,7 +23,7 @@
     "@nestjs/config": "12.1.1",
     "@wa/contracts": "workspace:*",
     "bullmq": "5.81.5",
-    "ioredis": "^5.8.0",
+    "ioredis": "^6.0.0",
     "pg": "^8.16.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
