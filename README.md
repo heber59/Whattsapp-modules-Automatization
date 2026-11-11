@@ -41,7 +41,6 @@ Start, message/menu, validated input, condition, variable, catalog/cart, order, 
 - [CI and service delivery](docs/ci-cd.md)
 - [Database](docs/database.md)
 - [Authentication and security](docs/authentication-security.md)
-- [Repository review](docs/repository-review.md)
 - [AI working rules](.ai)
 
 ## Current state

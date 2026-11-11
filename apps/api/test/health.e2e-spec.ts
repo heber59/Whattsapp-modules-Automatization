@@ -16,9 +16,16 @@ async function createApp(mode: 'test' | 'production') {
   const module = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(ConfigService).useValue(new ConfigService(config)).compile();
   const app = module.createNestApplication({ logger: false });
-  configureHttp(app);
-  await app.listen(0, '127.0.0.1');
-  return app;
+  try {
+    configureHttp(app);
+    await app.listen(0, '127.0.0.1');
+    return app;
+  } catch (error) {
+    try { await app.close(); } catch (cleanupError) {
+      throw new AggregateError([error, cleanupError], 'Health fixture initialization and cleanup failed');
+    }
+    throw error;
+  }
 }
 
 test('API health, Swagger navigation, and protected private routes', { timeout: 15000 }, async () => {

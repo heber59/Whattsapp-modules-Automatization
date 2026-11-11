@@ -4,6 +4,8 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 export function configureHttp(app: INestApplication): boolean {
   const config = app.get(ConfigService);
+  const proxies = config.getOrThrow<string[]>('TRUSTED_PROXIES');
+  app.getHttpAdapter().getInstance().set('trust proxy', proxies.length ? proxies : false);
   app.enableCors({ origin: config.getOrThrow<string>('WEB_ORIGIN') });
   if (config.get<string>('NODE_ENV') === 'production') return false;
 
