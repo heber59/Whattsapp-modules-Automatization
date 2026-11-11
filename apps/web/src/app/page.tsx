@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 export default function HomePage() {
   return (
     <main>
@@ -7,9 +9,10 @@ export default function HomePage() {
         conversations, with human support whenever it is needed.</p>
       <div className="status">Project in development</div>
       <section aria-labelledby="next-step">
-        <h2 id="next-step">First step: a solid foundation</h2>
-        <p>Order management, the workflow editor, and the WhatsApp connection
-          will become available in the next stages.</p>
+        <h2 id="next-step">Try a conversation flow</h2>
+        <p>Build a conversation, connect its steps, and try each reply in the customer preview.
+</p>
+        <Link className="button-link" href="/flows">Open flow playground</Link>
       </section>
     </main>
   );
