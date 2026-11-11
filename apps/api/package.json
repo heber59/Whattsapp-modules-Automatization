@@ -32,10 +32,10 @@
     "@nestjs/swagger": "12.1.1"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
+    "@types/node": "^26.6.6",
     "@types/pg": "^8.15.0",
     "ts-node": "10.9.2",
-    "typescript": "5.9.3",
+    "typescript": "7.0.2",
     "@nestjs/testing": "12.4.0"
   },
   "files": [
