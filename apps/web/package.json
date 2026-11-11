@@ -6,6 +6,7 @@
     "dev": "next dev --hostname 127.0.0.1",
     "build": "next build",
     "start": "next start --hostname 127.0.0.1",
+    "test:e2e": "node --test e2e/session.test.mjs",
     "typecheck": "next typegen && tsc --noEmit",
     "lint": "eslint src next.config.mjs --max-warnings=0"
   },

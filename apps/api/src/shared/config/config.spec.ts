@@ -29,6 +29,11 @@ test('configuration errors do not expose credentials', () => {
     (error: unknown) => error instanceof Error
       && error.message.includes('DATABASE_URL') && !error.message.includes('secret'),
   );
+  assert.throws(
+    () => validateEnvironment({ ...valid, WEB_AUTH_SECRET: 'private-short-key' }),
+    (error: unknown) => error instanceof Error
+      && error.message.includes('WEB_AUTH_SECRET') && !error.message.includes('private-short-key'),
+  );
 });
 
 test('HTTP binding and proxy trust require explicit valid network addresses', () => {

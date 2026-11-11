@@ -17,6 +17,8 @@ import { FixtureCleanup } from './fixture-cleanup';
 async function fixture(overrides: Record<string, unknown> = {}) {
   const cleanup = new FixtureCleanup();
   const identities = { alice: randomUUID(), bob: randomUUID(), anonymous: randomUUID() };
+  const refreshTokens = new Map<string, 'alice' | 'bob'>();
+  let logoutScope: string | null = null;
   let providerCalls = 0;
   const provider = createServer(async (request, response) => {
     providerCalls++;
@@ -24,7 +26,28 @@ async function fixture(overrides: Record<string, unknown> = {}) {
     if (request.url?.startsWith('/auth/v1/token')) {
       let raw = '';
       for await (const chunk of request) raw += String(chunk);
-      const credentials = JSON.parse(raw) as { email?: string; password?: string };
+      const credentials = JSON.parse(raw) as { email?: string; password?: string; refresh_token?: string };
+      if (request.url.includes('grant_type=refresh_token')) {
+        if (credentials.refresh_token === 'outage') {
+          response.writeHead(503).end(JSON.stringify({ message: 'test provider unavailable' }));
+          return;
+        }
+        const token = refreshTokens.get(credentials.refresh_token ?? '');
+        if (!token) {
+          response.writeHead(400).end(JSON.stringify({ message: 'invalid refresh token', code: 'refresh_token_not_found' }));
+          return;
+        }
+        refreshTokens.delete(credentials.refresh_token!);
+        const refreshToken = randomUUID();
+        refreshTokens.set(refreshToken, token);
+        response.end(JSON.stringify({
+          access_token: token, token_type: 'bearer', expires_in: 3600,
+          expires_at: Math.floor(Date.now() / 1000) + 3600, refresh_token: refreshToken,
+          user: { id: identities[token], aud: 'authenticated', role: 'authenticated',
+            created_at: '2026-01-01T00:00:00Z', app_metadata: {}, user_metadata: {} },
+        }));
+        return;
+      }
       if (credentials.email === 'outage@example.invalid') {
         response.writeHead(503).end(JSON.stringify({ message: 'test provider unavailable' }));
         return;
@@ -35,6 +58,7 @@ async function fixture(overrides: Record<string, unknown> = {}) {
         response.writeHead(400).end(JSON.stringify({ message: 'invalid login credentials', code: 'invalid_credentials' }));
         return;
       }
+      refreshTokens.set('test-refresh-' + token, token);
       response.end(JSON.stringify({
         access_token: token, token_type: 'bearer', expires_in: 3600,
         expires_at: Math.floor(Date.now() / 1000) + 3600, refresh_token: 'test-refresh-' + token,
@@ -44,6 +68,20 @@ async function fixture(overrides: Record<string, unknown> = {}) {
       return;
     }
     const token = request.headers.authorization?.replace('Bearer ', '');
+    if (request.url?.startsWith('/auth/v1/logout')) {
+      if (token === 'expired') {
+        response.writeHead(401).end(JSON.stringify({ message: 'expired JWT', code: 'bad_jwt' }));
+        return;
+      }
+      if (token === 'outage') {
+        response.writeHead(503).end(JSON.stringify({ message: 'test provider unavailable' }));
+        return;
+      }
+      logoutScope = new URL(request.url, 'http://localhost').searchParams.get('scope');
+      for (const [refreshToken, subject] of refreshTokens) if (subject === token) refreshTokens.delete(refreshToken);
+      response.writeHead(204).end();
+      return;
+    }
     if (token === 'outage') {
       response.writeHead(503).end(JSON.stringify({ message: 'test provider unavailable' }));
       return;
@@ -75,6 +113,7 @@ async function fixture(overrides: Record<string, unknown> = {}) {
       ...base, NODE_ENV: 'test',
       SUPABASE_URL: 'http://127.0.0.1:' + (provider.address() as AddressInfo).port,
       SUPABASE_PUBLISHABLE_KEY: 'test-publishable-key',
+      WEB_AUTH_SECRET: 'test-web-auth-secret-at-least-32-characters',
       RATE_LIMIT_PREFIX: 'wa:test:' + randomUUID(),
       RATE_LIMIT_IP_LIMIT: 100, RATE_LIMIT_USER_LIMIT: 100, RATE_LIMIT_WINDOW_MS: 3600000,
       ...overrides,
@@ -97,7 +136,7 @@ async function fixture(overrides: Record<string, unknown> = {}) {
       });
 
     return {
-      identities, request, database, get providerCalls() { return providerCalls; },
+      identities, request, database, get providerCalls() { return providerCalls; }, get logoutScope() { return logoutScope; },
       async close() {
         try {
           await database.query(`DELETE FROM app.businesses WHERE created_by IN
@@ -248,5 +287,95 @@ test('login limits normalized accounts before provider calls without exhausting 
     assert(Number(blocked.headers.get('Retry-After')) > 0);
     assert.equal(context.providerCalls, 2);
     assert.equal((await context.request('/auth/login', undefined, { email: 'bob@example.invalid', password: ' fixture password ' })).status, 200);
+  } finally { await context.close(); }
+});
+
+test('web sessions require the server client and rotate refresh tokens before local sign-out', { timeout: 20000 }, async () => {
+  const context = await fixture();
+  const headers = { 'X-Web-Auth-Key': 'test-web-auth-secret-at-least-32-characters' };
+  const credentials = { email: 'alice@example.invalid', password: ' fixture password ' };
+  try {
+    for (const endpoint of ['login', 'refresh', 'logout']) {
+      assert.equal((await context.request('/auth/web/' + endpoint, undefined, {})).status, 401);
+      assert.equal((await context.request('/auth/web/' + endpoint, undefined, {}, { 'X-Web-Auth-Key': 'wrong' })).status, 401);
+    }
+    assert.equal(context.providerCalls, 0);
+    const response = await context.request('/auth/web/login', undefined, credentials, headers);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('Cache-Control'), 'no-store');
+    const session = await response.json() as { access_token: string; refresh_token: string };
+    const renewed = await context.request('/auth/web/refresh', undefined, { refresh_token: session.refresh_token }, headers);
+    assert.equal(renewed.status, 200);
+    assert.equal(renewed.headers.get('Cache-Control'), 'no-store');
+    const tokens = await renewed.json() as { access_token: string; refresh_token: string };
+    const bobLogin = await context.request('/auth/web/login', undefined,
+      { email: 'bob@example.invalid', password: ' fixture password ' }, headers);
+    const bobTokens = await bobLogin.json() as { refresh_token: string };
+    assert.notEqual(tokens.refresh_token, session.refresh_token);
+    assert.equal((await context.request('/identity/me', tokens.access_token)).status, 200);
+    assert.equal((await context.request('/auth/web/refresh', undefined, { refresh_token: session.refresh_token }, headers)).status, 401);
+    assert.equal((await context.request('/auth/web/refresh', undefined, { refresh_token: tokens.refresh_token, role: 'owner' }, headers)).status, 400);
+    const logout = await context.request('/auth/web/logout', undefined, { access_token: tokens.access_token }, headers);
+    assert.equal(logout.status, 200);
+    assert.deepEqual(await logout.json(), { status: 'signed_out' });
+    assert.equal(context.logoutScope, 'local');
+    assert.equal((await context.request('/auth/web/refresh', undefined, { refresh_token: tokens.refresh_token }, headers)).status, 401);
+    assert.equal((await context.request('/auth/web/refresh', undefined, { refresh_token: bobTokens.refresh_token }, headers)).status, 200);
+    const httpLogin = await context.request('/auth/login', undefined, credentials);
+    assert.equal(httpLogin.status, 200);
+    assert.equal('refresh_token' in await httpLogin.json(), false);
+  } finally { await context.close(); }
+});
+
+test('web session renewal and sign-out report provider outages without exposing tokens', { timeout: 20000 }, async () => {
+  const context = await fixture();
+  const headers = { 'X-Web-Auth-Key': 'test-web-auth-secret-at-least-32-characters' };
+  try {
+    for (const [endpoint, body] of [
+      ['refresh', { refresh_token: 'outage' }], ['logout', { access_token: 'outage' }],
+    ] as const) {
+      const response = await context.request('/auth/web/' + endpoint, undefined, body, headers);
+      assert.equal(response.status, 503);
+      assert(!(await response.text()).includes('outage'));
+    }
+  } finally { await context.close(); }
+});
+
+test('expired access tokens must be renewed before the provider confirms local sign-out', { timeout: 20000 }, async () => {
+  const context = await fixture();
+  const headers = { 'X-Web-Auth-Key': 'test-web-auth-secret-at-least-32-characters' };
+  try {
+    const login = await context.request('/auth/web/login', undefined,
+      { email: 'alice@example.invalid', password: ' fixture password ' }, headers);
+    assert.equal(login.status, 200);
+    const session = await login.json() as { refresh_token: string };
+    const expired = await context.request('/auth/web/logout', undefined, { access_token: 'expired' }, headers);
+    assert.equal(expired.status, 401);
+    assert.equal(context.logoutScope, null);
+    const renewal = await context.request('/auth/web/refresh', undefined, { refresh_token: session.refresh_token }, headers);
+    assert.equal(renewal.status, 200);
+    const tokens = await renewal.json() as { access_token: string; refresh_token: string };
+    const logout = await context.request('/auth/web/logout', undefined, { access_token: tokens.access_token }, headers);
+    assert.equal(logout.status, 200);
+    assert.equal(context.logoutScope, 'local');
+    assert.equal((await context.request('/auth/web/refresh', undefined, { refresh_token: tokens.refresh_token }, headers)).status, 401);
+  } finally { await context.close(); }
+});
+
+test('web authentication fails closed without its server secret and preserves login account limits', { timeout: 20000 }, async () => {
+  const unavailable = await fixture({ WEB_AUTH_SECRET: '' });
+  try {
+    assert.equal((await unavailable.request('/auth/web/login', undefined, {})).status, 503);
+    assert.equal(unavailable.providerCalls, 0);
+  } finally { await unavailable.close(); }
+  const context = await fixture({ RATE_LIMIT_LOGIN_ACCOUNT_LIMIT: 1 });
+  const headers = { 'X-Web-Auth-Key': 'test-web-auth-secret-at-least-32-characters' };
+  try {
+    const credentials = { email: 'alice@example.invalid', password: 'wrong' };
+    assert.equal((await context.request('/auth/web/login', undefined, credentials, headers)).status, 401);
+    const blocked = await context.request('/auth/login', undefined, credentials);
+    assert.equal(blocked.status, 429);
+    assert(Number(blocked.headers.get('Retry-After')) > 0);
+    assert.equal(context.providerCalls, 1);
   } finally { await context.close(); }
 });

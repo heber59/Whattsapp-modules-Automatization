@@ -8,6 +8,7 @@ export default function HomePage() {
       <p>We are building a way to manage WhatsApp orders through configurable
         conversations, with human support whenever it is needed.</p>
       <div className="status">Project in development</div>
+      <p><Link className="button-link" href="/login">Sign in to your businesses</Link></p>
       <section aria-labelledby="next-step">
         <h2 id="next-step">Try a conversation flow</h2>
         <p>Build a conversation, connect its steps, and try each reply in the customer preview.
