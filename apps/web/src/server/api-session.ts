@@ -5,7 +5,7 @@ const accessCookie = 'wa-access';
 const refreshCookie = 'wa-refresh';
 const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/' };
 type Session = { access_token: string; refresh_token: string; expires_in: number };
-type BusinessPath = '/businesses' | `/businesses/${string}`;
+type BusinessPath = '/identity/me' | '/businesses' | `/businesses/${string}`;
 class InvalidRequest extends Error {}
 
 function configuration() {
@@ -174,7 +174,7 @@ export async function businesses(request: NextRequest, path: BusinessPath, metho
   try {
     const rejected = checkOrigin(request, method === 'POST');
     if (rejected) return rejected;
-    if (path !== '/businesses' && !/^\/businesses\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(path)) return reply({ message: 'Invalid business identifier' }, 400);
+    if (path !== '/identity/me' && path !== '/businesses' && !/^\/businesses\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(path)) return reply({ message: 'Invalid business identifier' }, 400);
     const body = method === 'POST' ? await json(request) : undefined;
     let token = request.cookies.get(accessCookie)?.value;
     if (!token) {

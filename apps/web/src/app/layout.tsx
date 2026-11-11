@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import './globals.css';
+import { Portal } from './portal';
 
 export const metadata: Metadata = {
   title: 'Whattsapp Automatization',
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body><Portal>{children}</Portal></body>
     </html>
   );
 }
