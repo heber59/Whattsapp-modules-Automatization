@@ -1,35 +1,35 @@
-# CI y entrega por servicio
+# CI and service delivery
 
-GitHub Actions verifica PR hacia develop/main y cambios publicados en esas ramas. No hay hosting elegido: se generan artefactos; el despliegue permanece pendiente.
+GitHub Actions checks PRs targeting develop/main and pushes to those branches. Hosting is not selected: delivery artifacts are generated, while deployment remains pending.
 
-| Cambio | Verificación |
+| Changed area | Verification |
 | --- | --- |
-| apps/web/ | Frontend: ESLint, tipos y build; sin PostgreSQL ni Redis. |
-| HTTP, health, identidad o acceso | API: ESLint, tipos, unitarios, end-to-end y build; PostgreSQL y Redis temporales. |
-| Entrada o consumidor del worker | Worker: ESLint, tipos, unitarios, end-to-end y build; solo Redis. |
-| Infraestructura o código compartido del backend | API y worker. |
-| packages/contracts/ | Contratos y sus consumidores: frontend, API y worker. |
-| Lockfile, configuración global o lógica del CI | Todos, por precaución. |
-| Solo documentación | Detector y estado final; sin arrancar servicios. |
+| apps/web/ | Frontend: ESLint, types, build; no PostgreSQL or Redis. |
+| HTTP, health, identity, authentication | API: ESLint, types, unit/end-to-end tests, build; temporary PostgreSQL and Redis. |
+| Worker entry point or consumer | Worker: ESLint, types, unit/end-to-end tests, build; Redis only. |
+| Shared backend code or infrastructure | API and worker. |
+| packages/contracts/ | Contracts and their consumers: frontend, API, worker. |
+| Lockfile, global settings, CI logic | All services, conservatively. |
+| Documentation only | Change detection and final result; no application services. |
 
-Los cambios se calculan contra la base del PR o el commit anterior del push. Un historial incompleto verifica todo. Las pruebas unitarias del detector protegen estas reglas. Los módulos futuros del backend se consideran compartidos salvo clasificación explícita.
+Changes are calculated against the PR merge base or previous push commit. Missing history triggers all checks. Focused detector tests protect these rules. Future backend modules are shared unless explicitly classified.
 
-## Calidad y seguridad
-- ESLint detecta problemas de código; se ejecuta también con pnpm lint.
-- pnpm audit revisa dependencias, incluidas las de desarrollo, y bloquea el CI ante avisos de gravedad alta o crítica.
-- CodeQL analiza JavaScript/TypeScript y publica hallazgos en Security. También se ejecuta semanalmente. Sus alertas deben revisarse: no equivalen automáticamente a una aprobación o bloqueo por vulnerabilidad.
-- Dependabot propone actualizaciones semanales hacia develop.
-- Las acciones están fijadas a revisiones concretas. Los PR no reciben secretos de despliegue.
+## Quality and security
+- ESLint checks code; run it locally with pnpm lint.
+- pnpm audit scans production and development dependencies. High or critical findings fail CI.
+- CodeQL scans JavaScript/TypeScript and publishes Security alerts, including a weekly run. Alerts require review; scan completion alone does not automatically approve or reject vulnerabilities.
+- Dependabot proposes weekly updates targeting develop.
+- Actions are pinned to specific revisions. PRs do not receive deployment secrets.
 
-CodeQL está disponible en repositorios públicos; los runners estándar de Actions son gratuitos para ellos. Los artefactos tienen retención de siete días y están sujetos a las cuotas de GitHub.
+CodeQL is available for public repositories. Standard Actions runners are free for them. Artifact retention is seven days, subject to GitHub quotas.
 
-## Entrega
-Después de verificar un servicio, los pushes a develop/main y las ejecuciones manuales en esas ramas producen su archivo tar.gz: web standalone, API o worker con dependencias productivas y release.json. Los PR verifican sin generar entregas. El tar conserva permisos y enlaces de dependencias.
+## Delivery
+Verified services produce tar.gz artifacts on develop/main pushes and manual runs on those branches: standalone frontend, API, or worker with production dependencies and release.json. PRs verify without generating delivery artifacts. Archives preserve dependency links and permissions.
 
-Para generar un artefacto local: ejecutar el build del servicio y luego pnpm package:web, pnpm package:api o pnpm package:worker. Usar Linux y la versión de Node del proyecto.
+For local artifacts, build the service, then run pnpm package:web, pnpm package:api, or pnpm package:worker. Use Linux and the project's Node version.
 
-No se reinicia ningún servicio por cambiar documentación. Las variables productivas futuras pertenecerán a cada servicio; editar secretos del hosting no dispara por sí solo este CI. Los cambios de variables del frontend incorporadas durante el build requerirán recompilarlo.
+Documentation changes do not restart services. Future production variables belong to each service. Hosting-secret edits do not automatically trigger CI; frontend variables embedded during build require rebuilding the frontend.
 
-Al publicar, recomendar configurar CI / Resultado como comprobación obligatoria de las ramas; esta protección no se cambia automáticamente.
+Configure CI / Result as a required branch check when publishing. Repository protection is not changed automatically.
 
-Fuentes: [CodeQL](https://docs.github.com/en/code-security/concepts/code-scanning/codeql/codeql-code-scanning) y [uso de Actions](https://docs.github.com/en/actions/concepts/billing-and-usage).
+References: [CodeQL](https://docs.github.com/en/code-security/concepts/code-scanning/codeql/codeql-code-scanning), [Actions usage](https://docs.github.com/en/actions/concepts/billing-and-usage).

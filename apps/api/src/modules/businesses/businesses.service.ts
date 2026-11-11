@@ -12,7 +12,7 @@ export class BusinessesService {
 
   async create(user: Principal, input: unknown) {
     const parsed = createBusiness.safeParse(input);
-    if (!parsed.success) throw new BadRequestException('Se requiere un nombre válido; no se aceptan permisos ni propietarios en el cuerpo');
+    if (!parsed.success) throw new BadRequestException('A valid name is required; permissions and owners are not accepted in the request body');
     const identity = await this.identity.sync(user);
     return this.repository.create(identity.id, parsed.data.name);
   }
@@ -25,7 +25,7 @@ export class BusinessesService {
   async find(user: Principal, businessId: string) {
     const identity = await this.identity.sync(user);
     const business = await this.repository.find(identity.id, businessId);
-    if (!business) throw new NotFoundException('Negocio no disponible');
+    if (!business) throw new NotFoundException('Business not available');
     return business;
   }
 }

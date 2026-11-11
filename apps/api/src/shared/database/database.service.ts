@@ -12,7 +12,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       connectionString: config.getOrThrow<string>('DATABASE_URL'),
       max: 5, connectionTimeoutMillis: 3000, query_timeout: 3000, idleTimeoutMillis: 10000,
     });
-    this.pool.on('error', () => this.logger.warn('Conexión inactiva a PostgreSQL interrumpida'));
+    this.pool.on('error', () => this.logger.warn('Idle PostgreSQL connection interrupted'));
   }
 
   query<T extends QueryResultRow = QueryResultRow>(sql: string, values: unknown[] = []) {

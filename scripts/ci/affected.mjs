@@ -56,7 +56,7 @@ function detect() {
     }).split('\0').filter(Boolean);
     return affected(files);
   } catch {
-    console.warn('No fue posible determinar el cambio; se verificarán todos los servicios.');
+    console.warn('Could not determine affected services; all services will be checked.');
     return everything();
   }
 }

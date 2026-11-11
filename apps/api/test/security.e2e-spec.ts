@@ -59,7 +59,7 @@ async function fixture(overrides: Record<string, unknown> = {}) {
   });
   await new Promise<void>((resolve) => provider.listen(0, '127.0.0.1', resolve));
   const base = validateEnvironment(process.env);
-  assert(['localhost', '127.0.0.1'].includes(new URL(base.DATABASE_URL).hostname), 'Usar solo PostgreSQL de pruebas local');
+  assert(['localhost', '127.0.0.1'].includes(new URL(base.DATABASE_URL).hostname), 'Use local test PostgreSQL only');
   const settings = {
     ...base, NODE_ENV: 'test',
     SUPABASE_URL: 'http://127.0.0.1:' + (provider.address() as AddressInfo).port,
@@ -106,19 +106,19 @@ async function fixture(overrides: Record<string, unknown> = {}) {
   };
 }
 
-test('sesión, membresías y datos de varios negocios permanecen aislados', { timeout: 30000 }, async () => {
+test('sessions, memberships, and business data remain isolated', { timeout: 30000 }, async () => {
   const context = await fixture();
   try {
     assert.equal((await context.request('/identity/me')).status, 401);
     assert.equal((await context.request('/identity/me', 'invalid')).status, 401);
     assert.equal((await context.request('/identity/me', 'anonymous')).status, 401);
     assert.equal((await context.request('/identity/me', 'outage')).status, 503);
-    assert.equal((await context.request('/businesses', 'alice', { name: 'Inválido', role: 'owner' })).status, 400);
-    const aResponse = await context.request('/businesses', 'alice', { name: 'Negocio A' });
+    assert.equal((await context.request('/businesses', 'alice', { name: 'Invalid', role: 'owner' })).status, 400);
+    const aResponse = await context.request('/businesses', 'alice', { name: 'Business A' });
     assert.equal(aResponse.status, 201);
     const a = await aResponse.json() as { id: string };
-    const a2 = await (await context.request('/businesses', 'alice', { name: 'Segundo negocio A' })).json() as { id: string };
-    const b = await (await context.request('/businesses', 'bob', { name: 'Negocio B' })).json() as { id: string };
+    const a2 = await (await context.request('/businesses', 'alice', { name: 'Second business A' })).json() as { id: string };
+    const b = await (await context.request('/businesses', 'bob', { name: 'Business B' })).json() as { id: string };
     const aliceList = await (await context.request('/businesses', 'alice')).json() as { id: string }[];
     assert.deepEqual(new Set(aliceList.map((business) => business.id)), new Set([a.id, a2.id]));
     assert.equal((await context.request('/businesses/' + b.id, 'alice')).status, 404);
@@ -131,7 +131,7 @@ test('sesión, membresías y datos de varios negocios permanecen aislados', { ti
     const membership = await (await context.request('/businesses/' + a.id, 'bob')).json() as { role: string };
     assert.equal(membership.role, 'operator');
 
-    for (const name of ['Producto 1', 'Producto 2']) {
+    for (const name of ['Product 1', 'Product 2']) {
       await context.database.query('INSERT INTO app.products(business_id, name, price) VALUES ($1, $2, 1500.50)', [a.id, name]);
     }
     for (let i = 0; i < 2; i++) {
@@ -139,17 +139,17 @@ test('sesión, membresías y datos de varios negocios permanecen aislados', { ti
         [a.id, '+57' + randomInt(10000000000, 99999999999)]);
     }
     await assert.rejects(
-      context.database.query("INSERT INTO app.products(business_id, name, price) VALUES ($1, 'Negativo', -1)", [a.id]),
+      context.database.query("INSERT INTO app.products(business_id, name, price) VALUES ($1, 'Negative', -1)", [a.id]),
       { code: '23514' },
     );
     await assert.rejects(
-      context.database.query("INSERT INTO app.products(business_id, name, price) VALUES ($1, 'Huérfano', 10)", [randomUUID()]),
+      context.database.query("INSERT INTO app.products(business_id, name, price) VALUES ($1, 'Orphan', 10)", [randomUUID()]),
       { code: '23503' },
     );
   } finally { await context.close(); }
 });
 
-test('el límite por usuario es atómico y no bloquea a otra cuenta de la misma IP', { timeout: 20000 }, async () => {
+test('user limits are atomic and do not block another account on the same IP', { timeout: 20000 }, async () => {
   const context = await fixture({ RATE_LIMIT_USER_LIMIT: 3 });
   try {
     const responses = await Promise.all(Array.from({ length: 12 }, () => context.request('/identity/me', 'alice')));
@@ -160,7 +160,7 @@ test('el límite por usuario es atómico y no bloquea a otra cuenta de la misma 
   } finally { await context.close(); }
 });
 
-test('el bucket por IP se aplica antes del proveedor y no acepta IP de headers arbitrarios', { timeout: 15000 }, async () => {
+test('IP limits run before provider calls and ignore arbitrary forwarded IP headers', { timeout: 15000 }, async () => {
   const context = await fixture({ RATE_LIMIT_IP_LIMIT: 2 });
   try {
     assert.equal((await context.request('/identity/me', 'bad', undefined, { 'X-Forwarded-For': '192.0.2.1' })).status, 401);
@@ -171,8 +171,8 @@ test('el bucket por IP se aplica antes del proveedor y no acepta IP de headers a
   } finally { await context.close(); }
 });
 
-test('sin configuración de Supabase no se habilitan rutas privadas', { timeout: 15000 }, async () => {
-  // Vacíos explícitos: ConfigService no debe recurrir a credenciales reales del entorno.
+test('private routes remain unavailable without Supabase configuration', { timeout: 15000 }, async () => {
+  // Explicit empty values prevent ConfigService from using real environment credentials.
   const context = await fixture({ SUPABASE_URL: '', SUPABASE_PUBLISHABLE_KEY: '' });
   try {
     assert.equal((await context.request('/identity/me', 'alice')).status, 503);
@@ -181,7 +181,7 @@ test('sin configuración de Supabase no se habilitan rutas privadas', { timeout:
   } finally { await context.close(); }
 });
 
-test('login HTTP devuelve una sesión utilizable y no comparte sesiones entre usuarios', { timeout: 20000 }, async () => {
+test('HTTP login returns a usable session without sharing sessions between users', { timeout: 20000 }, async () => {
   const context = await fixture();
   try {
     const results = await Promise.all([
@@ -210,7 +210,7 @@ test('login HTTP devuelve una sesión utilizable y no comparte sesiones entre us
   } finally { await context.close(); }
 });
 
-test('login limita la cuenta normalizada antes del proveedor y conserva el cupo de otras cuentas', { timeout: 20000 }, async () => {
+test('login limits normalized accounts before provider calls without exhausting other accounts', { timeout: 20000 }, async () => {
   const context = await fixture({ RATE_LIMIT_LOGIN_ACCOUNT_LIMIT: 2 });
   try {
     assert.equal((await context.request('/auth/login', undefined, { email: 'alice@example.invalid', password: 'wrong' })).status, 401);

@@ -1,51 +1,51 @@
 # Whattsapp Automatization
 
-Proyecto de micro-SaaS colombiano para automatizar la recepción y gestión de pedidos por WhatsApp mediante flujos visuales configurables por nodos.
+A Colombian micro-SaaS project for receiving and managing WhatsApp orders through configurable visual workflows.
 
-## Producto previsto
+## Planned product
 
-El comerciante podrá construir conversaciones desde un lienzo vacío: añadir nodos, conectarlos, configurar variables, validar el grafo, simularlo y publicar una versión. Los ejemplos de flujo no sustituirán la configuración libre dentro del catálogo de nodos disponible.
+Merchants build conversations from an empty canvas: add and connect nodes, configure variables, validate the graph, simulate execution, and publish a version. Example workflows do not replace free configuration within the supported node catalog.
 
-### Módulos core
-
-| Módulo | Alcance previsto |
+| Core module | Planned responsibility |
 | --- | --- |
-| Cuenta y negocio | Autenticación, roles y aislamiento de datos entre negocios. |
-| Conexión WhatsApp | Meta Cloud API directa, configuración del número y webhooks. |
-| Editor y motor | Flujos visuales, validación, versiones, simulación y ejecución persistida. |
-| Catálogo y pedidos | Productos, carrito, totales en COP, confirmación y estados del pedido. |
-| Bandeja humana | Contexto de conversación, asignación, pausa del bot y retoma controlada. |
-| Colas y operación | Procesamiento asíncrono, reintentos, idempotencia, auditoría y recuperación. |
-| Administración comercial | Alcance del piloto, condiciones, soporte y estado de suscripción. |
+| Accounts and businesses | Authentication, roles, and isolation between businesses. |
+| WhatsApp connection | Direct Meta Cloud API integration, phone numbers, and webhooks. |
+| Editor and execution engine | Visual workflows, validation, versions, simulation, and persisted execution. |
+| Catalog and orders | Products, cart, COP totals, confirmation, and order states. |
+| Human inbox | Conversation context, assignment, bot pause, and controlled handoff. |
+| Queues and operations | Background processing, retries, idempotency, auditing, and recovery. |
+| Commercial administration | Pilot scope, terms, support, and subscription status. |
 
-### Nodos del motor
+### Workflow nodes
 
-Inicio, mensaje o menú, captura validada, condición, variable, catálogo y carrito, pedido, espera y temporizador, acción HTTP restringida, transferencia humana y fin.
+Start, message/menu, validated input, condition, variable, catalog/cart, order, wait/timer, restricted HTTP action, human handoff, and end.
 
-## Stack confirmado para el SaaS
+## Confirmed stack
 
-| Capa | Tecnología |
+| Layer | Technology |
 | --- | --- |
 | Frontend | Next.js + React Flow |
 | Backend | NestJS + TypeScript |
-| Base de datos | PostgreSQL / Supabase |
-| Mensajería | Meta Cloud API directa |
-| Procesamiento asíncrono | Colas y workers; BullMQ + Redis o equivalente durable por evaluar |
-| Infraestructura | Hosting económico o gratuito compatible con uso comercial, pendiente de validación |
+| Database | PostgreSQL / Supabase |
+| Messaging | Direct Meta Cloud API |
+| Background processing | Queues and workers using BullMQ + Redis |
+| Hosting | Affordable or free commercial-compatible hosting; provider not selected yet |
 
-## Documentación
+## Documentation
 
-- [Estructura del repositorio](docs/estructura.md)
-- [Arquitectura del frontend](docs/frontend.md)
-- [Arquitectura del backend](docs/backend.md)
-- [Plan de trabajo](docs/plan-trabajo.md)
-- [Desarrollo local](docs/desarrollo-local.md)
-- [CI y entrega por servicio](docs/ci-cd.md)
-- [Base de datos](docs/bd.md)
-- [Autenticación y límites](docs/auth-seguridad.md)
-- [Recorrido en Postman](docs/postman.md)
-- [Reglas de trabajo con IA](.ai)
+- [Repository structure](docs/repository-structure.md)
+- [Frontend architecture](docs/frontend.md)
+- [Backend architecture](docs/backend.md)
+- [Work plan](docs/work-plan.md)
+- [Local development](docs/local-development.md)
+- [CI and service delivery](docs/ci-cd.md)
+- [Database](docs/database.md)
+- [Authentication and security](docs/authentication-security.md)
+- [Repository review](docs/repository-review.md)
+- [AI working rules](.ai)
 
-## Estado actual
+## Current state
 
-Base local de frontend, API y worker. PostgreSQL y Redis mediante Docker Compose. Identidad y negocios tienen una base protegida con Supabase Auth y límites por IP/usuario. POST /auth/login permite probar desde Postman. El login del frontend sigue pendiente. Editor, pedidos y Meta siguen pendientes. CI selectivo con ESLint y análisis de seguridad. Entrega por artefactos; despliegue pendiente de hosting.
+Local frontend, API, and worker, with PostgreSQL and Redis through Docker Compose. Identity and business endpoints use Supabase Auth and independent IP/user limits. POST /auth/login supports testing through HTTP clients. The frontend login, workflow editor, orders, and Meta integration remain pending.
+
+CI selects affected services and runs ESLint and security checks. Delivery artifacts are prepared; deployment awaits a hosting decision.

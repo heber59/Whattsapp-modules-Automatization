@@ -5,7 +5,7 @@ function hasProtocol(value: string, protocols: string[]): boolean {
 }
 
 const urlWithProtocols = (protocols: string[]) => z.string().refine(
-  (value) => hasProtocol(value, protocols), 'URL o protocolo de conexión inválido',
+  (value) => hasProtocol(value, protocols), 'Invalid URL or connection protocol',
 );
 const optionalText = z.preprocess((value) => value === '' ? undefined : value, z.string().min(1).optional());
 
@@ -15,7 +15,7 @@ const environmentSchema = z.object({
   WEB_ORIGIN: urlWithProtocols(['http:', 'https:']).refine(
     (value) => {
       try { return new URL(value).origin === value; } catch { return false; }
-    }, 'WEB_ORIGIN debe ser un origen HTTP sin ruta',
+    }, 'WEB_ORIGIN must be an HTTP origin without a path',
   ),
   DATABASE_URL: urlWithProtocols(['postgres:', 'postgresql:']),
   REDIS_URL: urlWithProtocols(['redis:', 'rediss:']),
@@ -28,7 +28,7 @@ const environmentSchema = z.object({
   RATE_LIMIT_PREFIX: z.string().regex(/^[a-zA-Z0-9:-]{1,64}$/).default('wa:rate'),
 }).superRefine((config, context) => {
   if (Boolean(config.SUPABASE_URL) !== Boolean(config.SUPABASE_PUBLISHABLE_KEY)) {
-    context.addIssue({ code: 'custom', path: ['SUPABASE_URL'], message: 'Configurar ambas variables de Supabase' });
+    context.addIssue({ code: 'custom', path: ['SUPABASE_URL'], message: 'Configure both Supabase variables' });
   }
   if (config.SUPABASE_URL) {
     try {
@@ -37,7 +37,7 @@ const environmentSchema = z.object({
       if (url.protocol !== 'https:' && !(url.protocol === 'http:' && local && config.NODE_ENV !== 'production')) throw new Error();
       if (url.username || url.password || url.search || url.hash || url.pathname !== '/') throw new Error();
     } catch {
-      context.addIssue({ code: 'custom', path: ['SUPABASE_URL'], message: 'Origen Supabase inválido' });
+      context.addIssue({ code: 'custom', path: ['SUPABASE_URL'], message: 'Invalid Supabase origin' });
     }
   }
 });
@@ -48,7 +48,7 @@ export function validateEnvironment(input: Record<string, unknown>): Environment
   const result = environmentSchema.safeParse(input);
   if (!result.success) {
     const keys = [...new Set(result.error.issues.map((issue) => issue.path.join('.')))];
-    throw new Error('Configuración inválida: ' + keys.join(', '));
+    throw new Error('Invalid configuration: ' + keys.join(', '));
   }
   return result.data;
 }

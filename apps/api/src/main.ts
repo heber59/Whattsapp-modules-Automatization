@@ -12,10 +12,10 @@ async function bootstrap() {
   app.enableShutdownHooks();
   await app.listen(config.getOrThrow<number>('PORT'), '127.0.0.1');
   const url = await app.getUrl();
-  if (docsEnabled) Logger.log(`Swagger disponible en ${url}/docs`, 'Bootstrap');
+  if (docsEnabled) Logger.log(`Swagger available at ${url}/docs`, 'Bootstrap');
 }
 
 void bootstrap().catch(() => {
-  Logger.error('No se pudo iniciar la API. Revisa configuración y servicios locales.', 'Bootstrap');
+  Logger.error('Could not start the API. Check configuration and local services.', 'Bootstrap');
   process.exit(1);
 });

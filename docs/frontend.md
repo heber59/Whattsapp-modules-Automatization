@@ -1,20 +1,20 @@
-# Arquitectura del frontend
+# Frontend architecture
 
-Next.js App Router + TypeScript + React Flow. Estructura objetivo:
+Next.js App Router + TypeScript + React Flow. Target structure:
 
 ```text
 apps/web/
-├── public/                              # Recursos estáticos
+├── public/                              # Static assets
 └── src/
-    ├── app/                             # Routing y composición de pantallas
-    │   ├── layout.tsx                   # Layout raíz
-    │   ├── providers.tsx                # Providers de React; no crea rutas
-    │   ├── globals.css                  # Estilos globales
-    │   ├── (auth)/                      # Grupo; no aparece en la URL
+    ├── app/                             # Routing and page composition
+    │   ├── layout.tsx                   # Root layout
+    │   ├── providers.tsx                # React providers; no route
+    │   ├── globals.css                  # Global styles
+    │   ├── (auth)/                      # Route group, excluded from URLs
     │   │   └── login/
     │   │       └── page.tsx             # /login
     │   └── (dashboard)/
-    │       ├── layout.tsx               # Layout del panel
+    │       ├── layout.tsx               # Dashboard layout
     │       ├── flows/
     │       │   ├── page.tsx             # /flows
     │       │   └── [flowId]/
@@ -29,34 +29,34 @@ apps/web/
     │           └── page.tsx
     ├── features/
     │   ├── auth/
-    │   ├── flows/                       # Ejemplo de organización por funcionalidad
-    │   │   ├── components/              # Editor, paneles y nodos visuales
-    │   │   ├── hooks/                   # Comportamiento del editor
-    │   │   ├── api/                     # Consultas y operaciones de flujos
-    │   │   ├── model/                   # Estado, tipos y reglas locales
-    │   │   └── utils/                   # Transformaciones puras
+    │   ├── flows/                       # Example feature layout
+    │   │   ├── components/              # Editor, panels, visual nodes
+    │   │   ├── hooks/                   # Editor behavior
+    │   │   ├── api/                     # Flow queries and mutations
+    │   │   ├── model/                   # State, types, local rules
+    │   │   └── utils/                   # Pure transformations
     │   ├── orders/
     │   ├── conversations/
     │   ├── catalog/
     │   └── settings/
     └── shared/
         ├── components/
-        │   ├── ui/                      # Botones, campos y diálogos
-        │   └── layout/                  # Navegación, sidebar y encabezado
-        ├── hooks/                       # Hooks reutilizados entre funcionalidades
-        ├── lib/                         # Cliente HTTP y configuración común
-        ├── types/                       # Tipos transversales de interfaz
-        └── utils/                       # Funciones puras compartidas
+        │   ├── ui/                      # Buttons, fields, dialogs
+        │   └── layout/                  # Navigation, sidebar, header
+        ├── hooks/                       # Cross-feature reusable hooks
+        ├── lib/                         # HTTP client and common settings
+        ├── types/                       # Shared interface types
+        └── utils/                       # Shared pure functions
 ```
 
-## Reglas de implementación
-- Páginas pequeñas: componen la pantalla y delegan comportamiento a su funcionalidad.
-- Componentes enfocados; operaciones de API separadas de la presentación.
-- Hooks con propósito; no convertir cada función en un hook.
-- Mantener lo específico en su funcionalidad. Mover a shared cuando exista reutilización real.
-- Dependencias: app → features → shared. Shared no importa funcionalidades; evitar dependencias circulares.
-- App Router usa app/.../page.tsx; no crear también src/pages.
-- Componentes de servidor por defecto; componentes de cliente donde se necesite interacción, como React Flow. Secretos solo en servidor.
-- Separar estado de interfaz del estado remoto; evitar un almacén global para todo.
-- Pruebas unitarias junto al código que verifican; recorridos end-to-end en apps/web/e2e/. Priorizar reglas del grafo, transformaciones y recorridos críticos.
-- Crear carpetas cuando exista código que las necesite; no generar carpetas vacías.
+## Implementation rules
+- Keep pages small: compose screens and delegate behavior to features.
+- Keep components focused and API operations separate from presentation.
+- Give hooks a purpose; do not turn every function into a hook.
+- Keep specific behavior in its feature. Move it to shared when reuse exists.
+- Dependency direction: app → features → shared. Shared does not import features; avoid cycles.
+- App Router uses app/.../page.tsx. Do not also create src/pages.
+- Default to server components. Use client components for interactions such as React Flow; keep secrets on the server.
+- Separate interface state from remote state; avoid one global store for everything.
+- Place focused unit tests next to the code they verify and end-to-end flows in apps/web/e2e/. Prioritize graph rules, transformations, and critical journeys.
+- Create directories when code needs them; avoid empty placeholders.

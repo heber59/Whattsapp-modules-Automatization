@@ -9,11 +9,11 @@ export function configureHttp(app: INestApplication): boolean {
 
   const options = new DocumentBuilder()
     .setTitle('Whattsapp Automatization')
-    .setDescription('API del micro-SaaS. Para rutas privadas utiliza un access_token de Supabase; no una clave de proyecto.')
+    .setDescription('Micro-SaaS API. Private routes require a Supabase access_token, not a project key.')
     .setVersion('0.1.0')
     .addBearerAuth({
       type: 'http', scheme: 'bearer', bearerFormat: 'JWT',
-      description: 'Token de acceso de una sesión Supabase. Introduce solo el token.',
+      description: 'Supabase session access token. Enter the token only.',
     }, 'supabase')
     .build();
   SwaggerModule.setup('docs', app, () => SwaggerModule.createDocument(app, options), {

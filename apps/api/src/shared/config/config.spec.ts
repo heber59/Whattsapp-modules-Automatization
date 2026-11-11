@@ -8,7 +8,7 @@ const valid = {
   REDIS_URL: 'redis://localhost:56379',
 };
 
-test('rechaza protocolos incorrectos, puertos inválidos y orígenes con ruta', () => {
+test('rejects invalid protocols, invalid ports, and origins containing paths', () => {
   assert.equal(validateEnvironment(valid).PORT, 3001);
   for (const patch of [
     { DATABASE_URL: 'https://localhost' },
@@ -23,7 +23,7 @@ test('rechaza protocolos incorrectos, puertos inválidos y orígenes con ruta', 
   ]) assert.throws(() => validateEnvironment({ ...valid, ...patch }));
 });
 
-test('los errores de configuración no revelan credenciales', () => {
+test('configuration errors do not expose credentials', () => {
   assert.throws(
     () => validateEnvironment({ ...valid, DATABASE_URL: 'https://user:secret@localhost' }),
     (error: unknown) => error instanceof Error
