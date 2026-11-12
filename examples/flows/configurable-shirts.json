@@ -1,0 +1,428 @@
+{
+  "schemaVersion": 1,
+  "name": "Configurable shirt shop",
+  "steps": [
+    {
+      "id": "start",
+      "kind": "Start",
+      "text": "Welcome to our shirt shop.",
+      "x": 0,
+      "y": 0,
+      "choices": [
+        {
+          "label": "Next",
+          "to": "menu"
+        }
+      ]
+    },
+    {
+      "id": "menu",
+      "kind": "Menu",
+      "text": "How can we help?",
+      "x": 220,
+      "y": 0,
+      "choices": [
+        {
+          "label": "Shop shirts",
+          "to": "catalog"
+        },
+        {
+          "label": "View PDF",
+          "to": "pdf"
+        },
+        {
+          "label": "Talk to an advisor",
+          "to": "advisor"
+        }
+      ]
+    },
+    {
+      "id": "pdf",
+      "kind": "Document",
+      "text": "Our full shirt collection",
+      "x": 440,
+      "y": 0,
+      "config": {
+        "url": "https://example.com/shirts.pdf",
+        "filename": "shirts.pdf"
+      },
+      "choices": [
+        {
+          "label": "Next",
+          "to": "menu"
+        }
+      ]
+    },
+    {
+      "id": "catalog",
+      "kind": "Catalog",
+      "text": "Choose a shirt",
+      "x": 660,
+      "y": 0,
+      "config": {
+        "variable": "product",
+        "products": [
+          {
+            "id": "cotton",
+            "name": "Cotton shirt",
+            "price": 50000
+          },
+          {
+            "id": "linen",
+            "name": "Linen shirt",
+            "price": 80000
+          }
+        ]
+      },
+      "choices": [
+        {
+          "label": "Next",
+          "to": "name"
+        }
+      ]
+    },
+    {
+      "id": "name",
+      "kind": "Input",
+      "text": "What name should we put on the order?",
+      "x": 880,
+      "y": 0,
+      "config": {
+        "variable": "customerName",
+        "required": true,
+        "min": 2,
+        "max": 100
+      },
+      "choices": [
+        {
+          "label": "Next",
+          "to": "size"
+        }
+      ]
+    },
+    {
+      "id": "size",
+      "kind": "Input",
+      "text": "Which size do you need?",
+      "x": 1100,
+      "y": 0,
+      "config": {
+        "variable": "size",
+        "required": true,
+        "max": 30
+      },
+      "choices": [
+        {
+          "label": "Next",
+          "to": "quantity"
+        }
+      ]
+    },
+    {
+      "id": "quantity",
+      "kind": "Input",
+      "text": "How many shirts?",
+      "x": 1320,
+      "y": 0,
+      "config": {
+        "variable": "quantity",
+        "required": true,
+        "inputType": "number",
+        "min": 1,
+        "max": 100
+      },
+      "choices": [
+        {
+          "label": "Next",
+          "to": "cart"
+        }
+      ]
+    },
+    {
+      "id": "cart",
+      "kind": "Cart",
+      "text": "",
+      "x": 1540,
+      "y": 0,
+      "config": {
+        "cartOperation": "add",
+        "quantity": {
+          "var": "quantity"
+        }
+      },
+      "choices": [
+        {
+          "label": "Next",
+          "to": "region"
+        }
+      ]
+    },
+    {
+      "id": "region",
+      "kind": "Input",
+      "text": "Delivery zone: local or other?",
+      "x": 1760,
+      "y": 0,
+      "config": {
+        "variable": "region",
+        "required": true
+      },
+      "choices": [
+        {
+          "label": "Next",
+          "to": "shipping"
+        }
+      ]
+    },
+    {
+      "id": "shipping",
+      "kind": "Condition",
+      "text": "",
+      "x": 1980,
+      "y": 0,
+      "config": {
+        "condition": {
+          "left": {
+            "var": "region"
+          },
+          "operator": "eq",
+          "right": "local"
+        }
+      },
+      "choices": [
+        {
+          "label": "Local",
+          "to": "local"
+        },
+        {
+          "label": "Other",
+          "to": "other"
+        }
+      ]
+    },
+    {
+      "id": "local",
+      "kind": "Set",
+      "text": "",
+      "x": 2200,
+      "y": 0,
+      "config": {
+        "variable": "shipping",
+        "value": 5000
+      },
+      "choices": [
+        {
+          "label": "Next",
+          "to": "total"
+        }
+      ]
+    },
+    {
+      "id": "other",
+      "kind": "Set",
+      "text": "",
+      "x": 2420,
+      "y": 0,
+      "config": {
+        "variable": "shipping",
+        "value": 12000
+      },
+      "choices": [
+        {
+          "label": "Next",
+          "to": "total"
+        }
+      ]
+    },
+    {
+      "id": "total",
+      "kind": "Calculate",
+      "text": "",
+      "x": 2640,
+      "y": 0,
+      "config": {
+        "variable": "total",
+        "expression": {
+          "op": "add",
+          "args": [
+            {
+              "var": "subtotal"
+            },
+            {
+              "var": "shipping"
+            }
+          ]
+        }
+      },
+      "choices": [
+        {
+          "label": "Next",
+          "to": "review"
+        }
+      ]
+    },
+    {
+      "id": "review",
+      "kind": "Menu",
+      "text": "{{customerName}}, size {{size}}. Total COP {{total}}. Confirm?",
+      "x": 2860,
+      "y": 0,
+      "choices": [
+        {
+          "label": "Confirm automatically",
+          "to": "automatic"
+        },
+        {
+          "label": "Request human approval",
+          "to": "human"
+        },
+        {
+          "label": "Talk to advisor",
+          "to": "advisor"
+        }
+      ]
+    },
+    {
+      "id": "automatic",
+      "kind": "Order",
+      "text": "Your order is confirmed.",
+      "x": 3080,
+      "y": 0,
+      "config": {
+        "confirmation": "automatic",
+        "fields": {
+          "customerName": {
+            "var": "customerName"
+          },
+          "size": {
+            "var": "size"
+          },
+          "region": {
+            "var": "region"
+          },
+          "shipping": {
+            "var": "shipping"
+          },
+          "total": {
+            "var": "total"
+          }
+        }
+      },
+      "choices": [
+        {
+          "label": "Next",
+          "to": "notify"
+        }
+      ]
+    },
+    {
+      "id": "human",
+      "kind": "Order",
+      "text": "Your order is awaiting business approval.",
+      "x": 3300,
+      "y": 0,
+      "config": {
+        "confirmation": "human",
+        "fields": {
+          "customerName": {
+            "var": "customerName"
+          },
+          "size": {
+            "var": "size"
+          },
+          "region": {
+            "var": "region"
+          },
+          "shipping": {
+            "var": "shipping"
+          },
+          "total": {
+            "var": "total"
+          }
+        }
+      },
+      "choices": [
+        {
+          "label": "Next",
+          "to": "decision"
+        }
+      ]
+    },
+    {
+      "id": "decision",
+      "kind": "Condition",
+      "text": "",
+      "x": 3520,
+      "y": 0,
+      "config": {
+        "condition": {
+          "left": {
+            "var": "orderStatus"
+          },
+          "operator": "eq",
+          "right": "confirmed"
+        }
+      },
+      "choices": [
+        {
+          "label": "Approved",
+          "to": "notify"
+        },
+        {
+          "label": "Cancelled",
+          "to": "cancelled"
+        }
+      ]
+    },
+    {
+      "id": "notify",
+      "kind": "Notify",
+      "text": "",
+      "x": 3740,
+      "y": 0,
+      "config": {
+        "recipient": "owner",
+        "message": "Order {{orderStatus}} for {{customerName}}: COP {{total}}, size {{size}}, zone {{region}}."
+      },
+      "choices": [
+        {
+          "label": "Next",
+          "to": "end"
+        }
+      ]
+    },
+    {
+      "id": "advisor",
+      "kind": "Handoff",
+      "text": "An advisor will help you.",
+      "x": 3960,
+      "y": 0,
+      "config": {
+        "recipient": "owner",
+        "message": "A customer requested an advisor."
+      },
+      "choices": [
+        {
+          "label": "Next",
+          "to": "menu"
+        }
+      ]
+    },
+    {
+      "id": "cancelled",
+      "kind": "End",
+      "text": "The business could not confirm your order. Please contact an advisor.",
+      "x": 4180,
+      "y": 0,
+      "choices": []
+    },
+    {
+      "id": "end",
+      "kind": "End",
+      "text": "Thank you, {{customerName}}. Order status: {{orderStatus}}.",
+      "x": 4400,
+      "y": 0,
+      "choices": []
+    }
+  ]
+}

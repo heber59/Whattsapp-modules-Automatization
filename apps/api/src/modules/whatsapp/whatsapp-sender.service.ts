@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { DatabaseService } from '../../shared/database/database.service';
 import { MetaGateway } from './meta.gateway';
 
-type Outbound = { id: string; phone_number_id: string; recipient: string; text: string; attempts: number };
+type Outbound = { id: string; phone_number_id: string; recipient: string; text: string; attempts: number; payload: { type: 'document' | 'image'; url: string; filename?: string; caption: string } | null };
 
 @Injectable()
 export class WhatsAppSenderService {
@@ -18,13 +18,13 @@ export class WhatsAppSenderService {
         WHERE phone_number_id=$1 AND state='sending' AND updated_at < now()-interval '2 minutes' RETURNING recipient`, [phone]);
       for (const row of stale.rows) await client.query("UPDATE app.whatsapp_conversations SET state='paused',updated_at=now() WHERE phone_number_id=$1 AND sender=$2", [phone,row.recipient]);
       await client.query("UPDATE app.whatsapp_outbox SET state='expired',updated_at=now() WHERE phone_number_id=$1 AND state='pending' AND expires_at<=now()", [phone]);
-      const result = await client.query<Outbound>(`SELECT o.id,o.phone_number_id,o.recipient,o.text,o.attempts FROM app.whatsapp_outbox o
+      const result = await client.query<Outbound>(`SELECT o.id,o.phone_number_id,o.recipient,o.text,o.attempts,o.payload FROM app.whatsapp_outbox o
         JOIN app.whatsapp_inbox i ON i.id=o.inbox_id
         JOIN app.whatsapp_channels ch ON ch.phone_number_id=o.phone_number_id
         JOIN app.whatsapp_conversations c ON c.phone_number_id=o.phone_number_id AND c.sender=o.recipient
-        WHERE o.phone_number_id=$1 AND ch.business_id=$2 AND o.state='pending' AND o.available_at<=now() AND o.expires_at>now() AND c.state<>'paused'
+        WHERE o.phone_number_id=$1 AND ch.business_id=$2 AND o.state='pending' AND o.available_at<=now() AND o.expires_at>now() AND (c.state<>'paused' OR o.payload->>'flowPauseNotice'='true' OR o.operator_message) AND (NOT c.operator_paused OR o.operator_message)
         AND NOT EXISTS (SELECT 1 FROM app.whatsapp_outbox prev JOIN app.whatsapp_inbox pi ON pi.id=prev.inbox_id
-          WHERE prev.phone_number_id=o.phone_number_id AND prev.recipient=o.recipient AND prev.state IN ('pending','sending','manual_review')
+          WHERE prev.phone_number_id=o.phone_number_id AND prev.recipient=o.recipient AND prev.state IN ('pending','sending','manual_review','failed')
           AND (pi.ingest_sequence,prev.sequence)<(i.ingest_sequence,o.sequence))
         ORDER BY i.ingest_sequence,o.sequence LIMIT 1 FOR UPDATE OF o SKIP LOCKED`, [phone,business]);
       const row = result.rows[0];
@@ -33,7 +33,7 @@ export class WhatsAppSenderService {
       return row;
     });
     if (!outbound) return false;
-    const result = await this.gateway.send(phone,outbound.recipient,outbound.text);
+    const result = await this.gateway.send(phone,outbound.recipient,outbound.text,outbound.payload?.type === 'document' || outbound.payload?.type === 'image' ? outbound.payload : null);
     await this.database.transaction(async (client) => {
       if (result.state === 'sent') {
         await client.query(`UPDATE app.whatsapp_outbox SET state='sent',provider_message_id=$2,updated_at=now(),delivery_status=

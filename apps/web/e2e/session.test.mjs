@@ -87,6 +87,13 @@ test('merchant cookies survive reload, renew, isolate businesses and clear on lo
       return send(201, business);
     }
     if (req.url === '/businesses') return send(200, owned);
+    const operationsRoute = new RegExp('^/businesses/([^/]+)/operations(?:/(actions|conversations)(?:/([0-9]+))?)?$').exec(req.url);
+    if (operationsRoute) {
+      if (!owned.some(business => business.id === operationsRoute[1])) return send(404, {});
+      if (operationsRoute[2] === 'actions') return send(200, {status:'ok', action:body});
+      if (operationsRoute[2] === 'conversations') return send(200, {messages:[{id:'inbound',direction:'inbound',text:'Hello',state:'processed'}]});
+      return send(200,{orders:[],conversations:[],notifications:[],deliveries:[]});
+    }
     const channelRoute = /^\/businesses\/([^/]+)\/whatsapp$/.exec(req.url);
     if (channelRoute) {
       if (!owned.some(business => business.id === channelRoute[1])) return send(404, {});
@@ -198,6 +205,20 @@ test('merchant cookies survive reload, renew, isolate businesses and clear on lo
   assert(created.ok);
   const { id } = await created.json();
   const flowPath = 'businesses/' + id + '/flows';
+  const operationsPath='businesses/'+id+'/operations';
+  assert.equal((await visitor(operationsPath)).status,401);
+  assert.equal((await bob(operationsPath)).status,404);
+  const operations=await alice(operationsPath);
+  assert.equal(operations.status,200);
+  assert.equal(operations.headers.get('cache-control'),'no-store');
+  assert.deepEqual(await operations.json(),{orders:[],conversations:[],notifications:[],deliveries:[]});
+  assert.equal((await alice(operationsPath+'/actions',{type:'pause',sender:'573001234567'},'https://unrelated.invalid')).status,403);
+  const action=await alice(operationsPath+'/actions',{type:'pause',sender:'573001234567'});
+  assert.equal(action.status,200);
+  assert.equal((await action.json()).action.type,'pause');
+  assert.equal((await alice(operationsPath+'/conversations/573001234567')).status,200);
+  assert.equal((await bob(operationsPath+'/actions',{type:'resume',sender:'573001234567'})).status,404);
+  assert.equal((await alice(operationsPath+'/conversations/invalid')).status,400);
   const channelPath = 'businesses/' + id + '/whatsapp';
   assert.equal((await visitor(channelPath)).status, 401);
   assert.equal((await bob(channelPath)).status, 404);

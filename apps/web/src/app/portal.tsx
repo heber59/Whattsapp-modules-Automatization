@@ -71,6 +71,7 @@ export function Portal({ children }: { children: ReactNode }) {
         <Link href="/#purpose">{t('Our purpose', 'Nuestro propósito')}</Link>
         <Link href="/#plans">{t('Plans', 'Planes')}</Link>
         <Link href="/#contact">{t('Contact', 'Contacto')}</Link>
+        <Link href="/operations" aria-current={pathname === '/operations' ? 'page' : undefined}>Operations</Link>
         <Link href="/flows" aria-current={pathname === '/flows' ? 'page' : undefined}>{t('Flow studio', 'Estudio de flujos')}</Link>
       </nav>
       <div className="header-actions">

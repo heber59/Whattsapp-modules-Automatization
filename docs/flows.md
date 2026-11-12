@@ -1,22 +1,30 @@
-# Flow storage and publication
+# Flow definitions and publication
 
-All flow endpoints require authentication and business membership. Owners/admins can create, save, and publish. Operators can read drafts and versions. The flows module obtains membership through BusinessesService; it does not query another module's tables.
+## Implemented contract
 
-| Endpoint under /businesses/:businessId/flows | Request / result |
+Endpoints under /businesses/:businessId/flows require membership. Owners/admins create, save and publish; operators read. Flows obtains membership through BusinessesService.
+
+| Endpoint | Request / result |
 | --- | --- |
-| GET / | Lists summaries in flows. |
-| POST / | name, steps → flow, revision 1. |
-| GET /:flowId | Returns flow including draft steps. |
-| PATCH /:flowId | name, steps, expectedRevision → updated flow. |
-| POST /:flowId/publish | expectedRevision → version snapshot. |
-| GET /:flowId/versions/:version | Returns an immutable version. |
+| GET / | Flow summaries. |
+| POST / | name, steps → flow at revision 1. |
+| GET /:flowId | Draft with steps. |
+| PATCH /:flowId | name, steps, expectedRevision → updated draft. |
+| POST /:flowId/publish | expectedRevision → immutable publication. |
+| GET /:flowId/versions/:version | Historical immutable snapshot. |
 
-Shared TypeScript shapes live in packages/contracts. Steps contain id, kind, text, x/y positions, and labelled choices pointing to step IDs. Supported kinds: Start, Message, Menu, End. Requests are capped at 64 KiB, 200 steps, 20 choices per step, and 4,000 text characters per step. Drafts may be incomplete, but structure must be bounded and IDs unique.
+Shared types, parsing, graph validation and simulation live in packages/contracts. Portable JSON uses schemaVersion: 1, name and steps. Each step contains id, kind, text, coordinates, choices and optional config. Limits: 64 KiB, 200 steps, 20 choices per step and 4,000 text characters per step.
 
-Publication requires exactly one Start, text on every step, valid labelled destinations, unique choice labels, and every node reachable from Start with a path to End. Start and Message have one outgoing choice; End has none. Automatic cycles are rejected. Loops through Menu are allowed because they wait for a customer choice. Replies cannot target Start.
+Implemented kinds: Start, Message, Menu, End, Input, Set, Condition, Calculate, Document, Image, Catalog, Cart, Order, Notify and Handoff. Customer fields, prices, shipping and confirmation belong to configuration. Catalog/cart are optional text-based capabilities; stock decisions belong to the business. See [scope](product-scope.md).
 
-Saving atomically checks expectedRevision and increments the draft revision. A stale edit returns 409; reload before retrying to avoid overwriting another editor. Publishing locks the draft row, validates its saved graph, and inserts a numbered immutable snapshot in one transaction. Concurrent publications of the same revision return the same version. Retrying an already published revision returns that historical snapshot even if the draft subsequently changed. Editing a draft never changes its published versions.
+## Validation and versioning
 
-Migration 004 creates business-scoped flow/version tables with RLS and a trigger rejecting version updates. Composite foreign keys prevent cross-business version references. Business deletion cascades to its flows and versions. API routes do not expose deletion or modification of publications.
+Drafts may be incomplete but must satisfy structural bounds. Publication requires one Start, reachable nodes, existing labelled destinations, valid node configurations and a path to End. End has no outgoing edge; Condition has two, ordered true/false; Menu has customer choices; other nodes have one continuation. Automatic cycles are rejected; customer-input and human-approval boundaries permit controlled loops.
 
-Publishing stores a version; it does not activate Meta webhooks, connect a WhatsApp number, or execute conversations. Those remain separate work.
+Saving atomically checks expectedRevision; stale changes return 409. Publication locks the draft and stores an immutable numbered snapshot transactionally. Retrying the same source revision returns its existing version. Existing conversations keep their published snapshot. Applying, publishing and assigning a channel are distinct operations.
+
+## Programmatic authoring
+
+Authenticated MCP exposes list/read/validate/simulate/diff/apply/publish on the same business operations. Simulation returns intended actions without external effects. Updates require revision checks; new definitions create drafts. Visual editing and JSON import/export share the runtime model. Terraform is inspiration, not a dependency.
+
+See [operations and authoring](operations-and-authoring.md) for configuration, confirmation branches, template alerts and MCP setup, and the [shirts example](../examples/flows/configurable-shirts.json). Real-provider acceptance remains pending. Timers, arbitrary code and restricted HTTP actions are not implemented.

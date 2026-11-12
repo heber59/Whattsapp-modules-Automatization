@@ -10,11 +10,12 @@ Whattsapp-modules-Automatization/
 │   └── dependabot.yml            # Dependency updates
 ├── scripts/ci/                   # Change detection and packaging
 ├── apps/
-│   ├── web/                      # Next.js + React Flow
+│   ├── web/                      # Next.js; SVG editor, React Flow planned
 │   └── api/                      # NestJS modules and worker entry point
 ├── packages/
 │   └── contracts/                # Public API types and schemas
 ├── docs/
+│   ├── product-scope.md          # Accepted configurable-platform scope
 │   ├── repository-structure.md   # Monorepo layout
 │   ├── frontend.md               # Frontend architecture
 │   ├── backend.md                # Backend responsibilities

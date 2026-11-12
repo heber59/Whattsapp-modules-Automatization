@@ -1,3 +1,4 @@
+import { NotificationSenderService } from './notification-sender.service';
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { WhatsAppRuntimeService } from './whatsapp-runtime.service';
@@ -9,12 +10,13 @@ export class WhatsAppWorkerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(WhatsAppWorkerService.name);
   private timer?: ReturnType<typeof setInterval>;
   private active?: Promise<void>;
-  constructor(private readonly config: ConfigService, private readonly runtime: WhatsAppRuntimeService, private readonly sender: WhatsAppSenderService) {}
+  constructor(private readonly config: ConfigService, private readonly runtime: WhatsAppRuntimeService, private readonly sender: WhatsAppSenderService, private readonly notifications: NotificationSenderService) {}
 
   async runOnce(): Promise<void> {
     if (missingMeta(this.config).length) return;
     await this.runtime.processOne();
     await this.sender.sendOne();
+    await this.notifications.sendOne();
   }
 
   onModuleInit(): void {
