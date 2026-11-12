@@ -1,3 +1,4 @@
+import { OperationsModule } from './modules/operations/operations.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { WhatsAppModule } from './modules/whatsapp/whatsapp.module';
 import { FlowsModule } from './modules/flows/flows.module';
@@ -13,7 +14,7 @@ import { HealthController } from './health/health.controller';
 import { HealthService } from './health/health.service';
 
 @Module({
-  imports: [EnvironmentModule, DatabaseModule, QueueModule, AccessModule, AuthModule, IdentityModule, BusinessesModule, CommercialModule, FlowsModule, WhatsAppModule],
+  imports: [EnvironmentModule, DatabaseModule, QueueModule, AccessModule, AuthModule, IdentityModule, BusinessesModule, CommercialModule, FlowsModule, WhatsAppModule, OperationsModule],
   controllers: [HealthController], providers: [HealthService],
 })
 export class AppModule {}

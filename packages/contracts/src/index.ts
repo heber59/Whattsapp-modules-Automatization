@@ -8,7 +8,7 @@ export interface HealthResponse {
   };
 }
 
-export type FlowStepKind = 'Start' | 'Message' | 'Menu' | 'End';
+export type FlowStepKind = typeof import('./flow-types').flowStepKinds[number];
 export interface FlowStep {
   id: string;
   kind: FlowStepKind;
@@ -16,6 +16,7 @@ export interface FlowStep {
   x: number;
   y: number;
   choices: { label: string; to: string }[];
+  config?: import('./flow-types').FlowNodeConfig;
 }
 export interface FlowSummary {
   id: string;
@@ -36,3 +37,6 @@ export interface PublishedFlowVersion {
   steps: FlowStep[];
   publishedAt: string;
 }
+
+export * from './flow-types';
+export * from './flow-runtime';

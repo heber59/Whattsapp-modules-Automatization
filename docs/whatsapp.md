@@ -1,32 +1,29 @@
-# WhatsApp pilot integration
+# WhatsApp integration
 
-The pilot uses one server-approved Meta phone and business. Configure `META_ACCESS_TOKEN`, `META_APP_SECRET`, `META_VERIFY_TOKEN`, `META_PHONE_NUMBER_ID`, `META_BUSINESS_ID`, and `META_GRAPH_VERSION` privately in both API and worker. Missing settings disable processing without inventing credentials. Graph requests target Meta's origin; a localhost simulator is permitted only in test mode.
+The pilot supports one server-approved Meta phone and business. Configure `META_ACCESS_TOKEN`, `META_APP_SECRET`, `META_VERIFY_TOKEN`, `META_PHONE_NUMBER_ID`, `META_BUSINESS_ID`, and `META_GRAPH_VERSION` privately in API and worker. Missing settings disable processing. A localhost Graph simulator is allowed only in test mode.
 
-## Setup and access
+## Setup and reception
 
-GET/POST `/businesses/:businessId/whatsapp` require membership. Only owners/admins of the server-approved business can assign a published `flowId` and `version`. Client-supplied credentials or phone IDs are rejected. Other businesses cannot claim the pilot number. Saved assignment means configured routing, not verified delivery. See [first pilot setup](whatsapp-pilot-setup.md).
+Authenticated owners/admins of the approved business assign a published flow through `/businesses/:businessId/whatsapp`; operators view setup. Credentials and phone IDs cannot be supplied by the browser. Assignment configures routing, not verified device delivery. Follow [pilot setup](whatsapp-pilot-setup.md).
 
-## Reception and execution
+Webhook GET verifies the token and echoes the challenge. POST verifies the exact raw-body signature before persistence. Unknown phones and unsupported inbound message types do not trigger replies. Inbox IDs deduplicate events and ingest sequence preserves batch ordering.
 
-GET `/webhooks/whatsapp` verifies the token and echoes the challenge. POST validates `X-Hub-Signature-256` against the exact raw request body before accepting events. The standard JSON body-size limit applies. Unknown phone numbers and unsupported message types produce no reply.
+## Configurable execution
 
-Migration 005 stores channels, deduplicated inbox events, conversation state, ordered outbox replies, and delivery events. Webhooks acknowledge after persistence. Ingest sequence preserves batch order; workers serialize each sender's conversation with transaction locks.
+The worker executes published graphs with menus, validated questions, variables, conditions, calculations, documents/images, embedded catalogs/cart, optional orders, notifications, and handoff. Businesses define customer fields, product questions, availability policy, and shipping rules. Active conversations retain their published version; completed or inactive conversations restart on the channel's current version.
 
-The worker executes published Start, Message, Menu, and End steps. Customers choose by number or matching label; invalid choices repeat the menu. Active conversations keep their published snapshot. Completed conversations or a day of inactivity start with the channel's current version. Replies are split below provider text limits without breaking Unicode surrogate pairs.
+Variables, checkpoints, order snapshots, notifications, and outbound actions persist atomically. Text actions are grouped; media actions retain their place in the outbound sequence. Document/image payloads use Meta links. Actual URL accessibility and provider acceptance still require real-provider testing.
 
-## Delivery and recovery
+Human Order nodes pause. Confirm/cancel records `orderStatus`; a persisted internal event continues to downstream conditions without waiting for another customer message. Explicit operator pauses remain in force. Handoff pauses automation and creates a configured notification. Resume explicitly continues the flow. Customer messages received during human attention remain visible in history and update the messaging window without running the bot.
 
-Run the separate worker with PostgreSQL and Redis. WhatsApp uses a durable PostgreSQL polling loop alongside the existing BullMQ diagnostic worker. Restarting preserves pending work. Only customer-initiated text replies within the conservative 23-hour-50-minute limit are eligible; expired work is not sent.
+## Human response and notifications
 
-An explicit 429 response retries with bounded backoff. Network failures, server errors, malformed acknowledgements, and abandoned sending claims require manual review and pause the conversation. This avoids blind duplicate sends when provider acceptance is uncertain. Permanent rejections also pause the conversation. No exactly-once external-delivery guarantee is claimed.
+The operations inbox provides history, operator replies, order decisions, pause/resume, and delivery review. Notifications default to the internal inbox. Notify/Handoff can select WhatsApp, an E.164 recipient, and a merchant-approved template name/language. The template must contain one body text placeholder for the rendered message (maximum 1,024 characters). Durable polling dispatches alerts independently of the customer messaging window. Template approval must already exist in Meta; API acceptance does not prove device delivery. Email, push, and recipient-specific routing remain pending.
 
-Inspect operational state through trusted database access:
+Manual pause blocks queued bot output; operator replies can still be delivered. Failed or uncertain sends require review before resuming. Owners/admins can record verified provider acceptance or discard a delivery; no blind resend action exists.
 
-```sql
-SELECT state, count(*) FROM app.whatsapp_outbox GROUP BY state;
-SELECT state, count(*) FROM app.whatsapp_inbox GROUP BY state;
-```
+## Delivery and acceptance
 
-Investigate failed/manual-review rows individually against provider records before resolving them; never bulk-requeue uncertain sends. There is no operator recovery UI yet. Delivery callbacks record sent/delivered/read/failed status; API acceptance alone does not prove device delivery.
+PostgreSQL polling runs alongside the BullMQ diagnostic worker. The conservative messaging window is 23 hours 50 minutes; expiry is retained through approval/resumption. Explicit 429 responses retry with bounded backoff. Network/server errors, malformed acknowledgements, or abandoned sending claims pause for manual review. Exactly-once external delivery is not guaranteed. Callbacks record sent/delivered/read/failed status.
 
-Tests use signed payloads, isolated PostgreSQL, and a local Graph simulator. Real Meta setup and a real-phone acceptance test remain required. Media replies, templates, billing, and multi-number onboarding are outside this pilot.
+Migrations 006–007 are required and verified only in isolated tests. External alerts retry explicit 429 responses; uncertain acceptance or stale sending claims require owner/admin review, never blind retries. Simulated-provider tests cover ordering, deduplication, media persistence, custom data, decisions, manual handling, and recovery. Real Meta/Supabase acceptance, deployment, and device delivery remain pending. Billing and multi-number onboarding remain pending.

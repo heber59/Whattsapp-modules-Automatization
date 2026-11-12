@@ -1,28 +1,28 @@
 # Work plan
 
-Reviewed November 11, 2026. Delivery follows dependencies and acceptance evidence.
+Reviewed November 12, 2026. The accepted [scope](product-scope.md) is business-configurable conversations: content, questions, pricing, confirmation, and advisor routes. No universal store journey or customer form is imposed.
 
-## Delivery sequence
+## Delivery status
 
-Owner roles identify areas of responsibility. Rows describe dependencies; independent preparation may run in parallel.
+| Delivery | Implementation | Acceptance or remaining work |
+| --- | --- | --- |
+| Accounts and businesses | Registration, login, refresh, recovery, permissions, isolation | Real Supabase acceptance pending. |
+| Declarative authoring | Versioned JSON, editor import/export, shared validation/simulation, revisions and immutable publications | Existing four-node definitions remain supported. Terraform is inspiration, not a dependency. |
+| MCP tools | Authenticated list/read/validate/simulate/diff/apply/publish over HTTP | Revision 2025-11-25; configure an authenticated client. Applying, publishing, and channel assignment are separate. |
+| Conversation engine | Fifteen node kinds; inputs, variables, conditions, arithmetic, media/PDF, optional catalog/cart | Catalog is text selection. Stock belongs to the business. Media needs reachable merchant URLs. |
+| Configurable orders | Captured data, calculated amounts, automatic confirmation or human approval, queries | Approval/cancellation exposes orderStatus for downstream conditions. No payment processing. |
+| Human attention | Inbox history, replies, pause/resume, advisor routes, delivery review, external template alerts | Configure approved templates and recipient phones; real notification acceptance pending. |
+| WhatsApp delivery | Signed webhooks, durable inbox/outbox, media/text actions, pinned conversations, deduplication and recovery | Real-phone reception, replies, media and restart acceptance pending. One server-approved number/business. |
+| Hosting and pilot | CI and delivery packaging | Select ingress/provider, validate proxies, execute artifacts and accept a merchant journey. |
 
-| Delivery | Status | Owner role | Blocker and next action | Acceptance evidence |
-| --- | --- | --- | --- | --- |
-| Reproducible foundation | Locally verified | Engineering / QA | Record the candidate commit and CI run. | Lint, types, five CI tests, two configuration tests, nine integration tests, and API/web builds passed locally before publication. |
-| Hosting topology | HTTP configuration prepared locally; ingress pending | Infrastructure | Select ingress, process topology, and provider; validate bind address and trusted proxies accordingly. | Reachable API and correct client IP limits through the selected ingress; forwarding headers from untrusted peers are ignored. |
-| Merchant session and permissions | Partial | Frontend / backend | Verify real Supabase sessions, add recovery, and define administrative permissions. | Login, refresh, recovery, sign-out, business isolation, and role restrictions; real Supabase acceptance recorded separately. |
-| Persistent WhatsApp channel | Simulator verified; Meta acceptance pending | Integration / backend | Create Meta application, configure test number and HTTPS webhook. | Signed reception, deduplication, ordered menus, retry and restart recovery pass local integration tests. Real-phone acceptance is pending. |
-| Configurable first order | Pending | Product / frontend / backend | Approve initial node catalog and required order fields; build editor, versioned execution, and orders. | Merchant builds from an empty canvas; customer confirms exactly one order with server-calculated COP totals. |
-| Release candidate and pilot | Pending | QA / operations / pilot lead | Complete the journey, resilience checks, and pilot agreement. | Recorded recovery checks, real-provider journey, deployment validation, and explicit pilot acceptance. |
+## Verification
 
-## Tracking
+Development verification on November 12 passed types, lint, 20 unit tests, 20 backend integration tests (one additional fixture probe skipped), five CI tests, web-proxy integration, production builds and API packaging with compiled contracts. Record checks against a candidate commit before release. Simulators and isolated databases do not establish real-provider acceptance.
 
-Use Pending → In progress → Implemented → Verified. Each change records its owner, blocker, next action, candidate commit, and test or CI evidence. A configured integration is not verified until acceptance succeeds. Recheck evidence after relevant implementation changes.
+Migrations 006–007 add variables, typed outbound payloads, orders and durable notifications. Apply them explicitly to the intended environment; testing does not migrate an existing merchant database.
 
-Current implementation includes identity, business isolation, authentication, contact requests, server flow drafts, and immutable publications. Migrations 001–005 are applied to the configured database. The worker executes published text menus with persistent inbox/outbox and conversation state. Twelve unit tests, eighteen API integration tests, web-proxy integration, lint, and builds passed; one fixture probe is intentionally skipped. Real Meta credentials, HTTPS hosting, phone acceptance, orders, and subscriptions remain pending. See [WhatsApp setup](whatsapp-pilot-setup.md), [flows](flows.md), and [delivery](ci-cd.md).
+## Next delivery
 
-Authentication tests use a simulated provider. Real-user Supabase login, Meta acceptance, production deployment, and artifact execution remain unverified.
+Configure approved owner-notification templates and recipients. Validate a merchant-created flow on Meta's test number, including media, external alerts, advisor handoff and human confirmation. Complete real authentication and hosting acceptance. Subscriptions, additional phone onboarding, timers, and restricted HTTP actions remain future work.
 
-## Product scope
-
-The first journey must preserve freely configurable graphs within the supported node catalog. Initial nodes and order fields are proposals until approved. Broader nodes, simulation, human inbox, and commercial administration follow explicit acceptance needs; they are not implied complete by the first order.
+Use Pending → In progress → Implemented → Verified. Track owner, blocker, candidate commit and evidence. Configuration alone never proves live delivery.

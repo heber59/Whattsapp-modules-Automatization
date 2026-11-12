@@ -1,6 +1,8 @@
 'use client';
 
 import Link from 'next/link';
+import { parseFlowDefinition, runFlow, type FlowVariables, type FlowResult } from '@wa/contracts';
+import { NodeConfigEditor, defaultConfig } from './node-config-editor';
 import { useEffect, useRef, useState } from 'react';
 import './flows.css';
 import { useFlowPersistence } from './use-flow-persistence';
@@ -31,12 +33,17 @@ function Playground() {
   };
   const translate = (message: string) => t(message, messages[message] ?? message);
 
-  const kindLabel = (kind: Kind) => t(kind, ({ Start: 'Inicio', Message: 'Mensaje', Menu: 'Menú', End: 'Fin' })[kind]);
+  const kindLabel = (kind: Kind) => kind;
   const [steps, setSteps] = useState<Step[]>([]);
   const [selected, select] = useState('');
   const [error, setError] = useState('');
   const [chat, setChat] = useState<{ text: string; user?: boolean }[]>([]);
   const [at, setAt] = useState('');
+  const [variables, setVariables] = useState<FlowVariables>({});
+  const [result,setResult] = useState<FlowResult|null>(null);
+  const [answer,setAnswer] = useState('');
+  const [configValid,setConfigValid] = useState(true);
+  const importFile=useRef<HTMLInputElement>(null);
   const drag = useRef<{
     id: string;
     x: number;
@@ -47,14 +54,21 @@ function Playground() {
   const persistence = useFlowPersistence(user!.id, steps, setSteps, t);
   const ready = !persistence.loading && !!persistence.businessId;
   const editable = ready && persistence.writable;
-  useEffect(() => { queueMicrotask(() => { select(''); setChat([]); setAt(''); setError(''); }); }, [persistence.flow?.id, persistence.flow?.revision, persistence.businessId]);
+  useEffect(() => { queueMicrotask(() => { select(''); setChat([]); setAt(''); setError(''); setVariables({}); setResult(null); setConfigValid(true); }); }, [persistence.flow?.id, persistence.flow?.revision, persistence.businessId]);
+  useEffect(()=>{
+    if(configValid)return;
+    const warn=(event:BeforeUnloadEvent)=>event.preventDefault();
+    const navigate=(event:MouseEvent)=>{if((event.target as Element|null)?.closest('a[href]')&&!window.confirm('Leave invalid configuration edits? They cannot be saved until the JSON is corrected.')){event.preventDefault();event.stopPropagation();}};
+    window.addEventListener('beforeunload',warn);document.addEventListener('click',navigate,true);
+    return()=>{window.removeEventListener('beforeunload',warn);document.removeEventListener('click',navigate,true);};
+  },[configValid]);
   const active = steps.find((step) => step.id === selected);
   const current = steps.find((step) => step.id === at);
   function edit(next: Step[]) {
     setSteps(next);
     setError('');
     setChat([]);
-    setAt('');
+    setAt(''); setResult(null); setVariables({});
   }
   function patch(change: Partial<Step>) {
     edit(
@@ -67,55 +81,52 @@ function Playground() {
     const step: Step = {
       id: crypto.randomUUID(),
       kind,
+      config: defaultConfig(kind),
       text: kind === 'Menu' ? t('Choose an option', 'Elige una opción') : kindLabel(kind),
       x: 25 + (steps.length % 4) * 245,
       y: 35 + Math.floor(steps.length / 4) * 145,
       choices:
         kind === 'End'
           ? []
+          : kind === 'Condition' ? [{label:'True',to:''},{label:'False',to:''}]
           : [{ label: kind === 'Menu' ? t('Option 1', 'Opción 1') : t('Next', 'Siguiente'), to: '' }],
     };
     edit([...steps, step]);
     select(step.id);
   }
   function play(id: string, reply?: string) {
-    const lines = reply ? [...chat, { text: reply, user: true }] : [];
-    const seen = new Set<string>();
-    let step = steps.find((targetStep) => targetStep.id === id);
-    while (step) {
-      if (seen.has(step.id)) {
-        setError(
-          'This path loops before the customer can reply. Change a connection and try again.',
-        );
-        break;
-      }
-      seen.add(step.id);
-      if (step.kind !== 'Start') lines.push({ text: step.text });
-      if (step.kind === 'Menu' || step.kind === 'End') {
-        setAt(step.id);
-        setChat(lines);
-        return;
-      }
-      const target = step.choices[0]?.to;
-      step = steps.find((targetStep) => targetStep.id === target);
-    }
-    setAt('');
-    setChat(lines);
+    try {
+      const next=runFlow(steps,reply===undefined?null:id,reply??'',reply===undefined?{}:variables);
+      setVariables(next.variables);setResult(next);setAt(next.currentStep??'');setAnswer('');
+      const previous=reply===undefined?[]:[...chat,{text:reply,user:true}];
+      setChat([...previous,...next.actions.map(action=>({text:action.type==='text'?action.text:action.type==='document'||action.type==='image'?action.type+': '+action.url:JSON.stringify(action)}))]);
+      setError('');
+    } catch(cause){setError(cause instanceof Error?cause.message:'Simulation failed');}
+  }
+  function exportDefinition(){
+    const blob=new Blob([JSON.stringify({schemaVersion:1,name:persistence.name,steps},null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob),anchor=document.createElement('a');anchor.href=url;anchor.download='flow.json';anchor.click();URL.revokeObjectURL(url);
+  }
+  async function importDefinition(file:File){
+    try{if(file.size>65536)throw new Error('Flow definitions must fit within 64 KiB.');const definition=parseFlowDefinition(JSON.parse(await file.text()));
+      if(steps.length&&!window.confirm('Replace the current draft with this definition?'))return;
+      edit(definition.steps);persistence.setName(definition.name);select('');setConfigValid(true);
+    }catch(cause){setError(cause instanceof Error?cause.message:'Invalid flow definition');}
   }
   const width = Math.max(1100, ...steps.map((step) => step.x + 225)),
     height = Math.max(640, ...steps.map((step) => step.y + 115));
   return (
     <main className="studio">
-      <nav className="studio-route-links"><Link className="studio-back" href="/businesses">← {t("My workspace", "Mi espacio")}</Link><Link className="studio-back" href="/whatsapp">{t("WhatsApp setup", "Configurar WhatsApp")} ↗</Link></nav>
+      <nav className="studio-route-links"><Link className="studio-back" href="/businesses">← {t("My workspace", "Mi espacio")}</Link><Link className="studio-back" href="/operations">Business operations ↗</Link><Link className="studio-back" href="/whatsapp">{t("WhatsApp setup", "Configurar WhatsApp")} ↗</Link></nav>
       <header>
         <div>
           <h1>{t("Flow studio", "Estudio de flujos")}</h1>
           <p>
-            {t('Business drafts and immutable published versions. WhatsApp execution is not connected.', 'Borradores por negocio y versiones publicadas inmutables. La ejecución de WhatsApp no está conectada.')}
+            {t('Build configurable conversations, preview them, then assign a published version to WhatsApp.', 'Crea conversaciones configurables, pruébalas y asigna una versión publicada a WhatsApp.')}
           </p>
         </div>
         <button
-          disabled={!editable}
+          disabled={!editable || !configValid}
           onClick={() => {
             if (
               !steps.length ||
@@ -131,13 +142,16 @@ function Playground() {
       </header>
       <section className="flow-manager" aria-label={t('Server flow management', 'Gestión de flujos en el servidor')}>
         <div className="flow-manager-fields">
-          <label>{t('Business', 'Negocio')}<select value={persistence.businessId} disabled={persistence.busy || persistence.loading} onChange={event => void persistence.chooseBusiness(event.target.value)}><option value="">{t('Choose a business', 'Elige un negocio')}</option>{persistence.businesses.map(business => <option key={business.id} value={business.id}>{business.name}</option>)}</select></label>
-          <label>{t('Flow', 'Flujo')}<select value={persistence.flow?.id ?? ''} disabled={!ready || persistence.busy} onChange={event => void persistence.loadFlow(event.target.value)}><option value="">{t('New flow', 'Flujo nuevo')}</option>{persistence.flows.map(flow => <option key={flow.id} value={flow.id}>{flow.name}</option>)}</select></label>
-          <label>{t('Flow name', 'Nombre del flujo')}<input value={persistence.name} maxLength={100} disabled={!editable || persistence.busy} onChange={event => persistence.setName(event.target.value)} /></label>
+          <label>{t('Business', 'Negocio')}<select value={persistence.businessId} disabled={!configValid || persistence.busy || persistence.loading} onChange={event => void persistence.chooseBusiness(event.target.value)}><option value="">{t('Choose a business', 'Elige un negocio')}</option>{persistence.businesses.map(business => <option key={business.id} value={business.id}>{business.name}</option>)}</select></label>
+          <label>{t('Flow', 'Flujo')}<select value={persistence.flow?.id ?? ''} disabled={!ready || !configValid || persistence.busy} onChange={event => void persistence.loadFlow(event.target.value)}><option value="">{t('New flow', 'Flujo nuevo')}</option>{persistence.flows.map(flow => <option key={flow.id} value={flow.id}>{flow.name}</option>)}</select></label>
+          <label>{t('Flow name', 'Nombre del flujo')}<input value={persistence.name} maxLength={100} disabled={!editable || !configValid || persistence.busy} onChange={event => persistence.setName(event.target.value)} /></label>
         </div>
         <div className="flow-manager-actions">
-          <button disabled={!editable || persistence.busy || !persistence.dirty && !!persistence.flow} onClick={() => void persistence.save()}>{persistence.busy ? t('Please wait…', 'Espera…') : t('Save draft', 'Guardar borrador')}</button>
-          <button disabled={!editable || persistence.busy || !persistence.flow || persistence.dirty} onClick={() => void persistence.publish()}>{t('Publish version', 'Publicar versión')}</button>
+          <button disabled={!ready || !configValid} onClick={exportDefinition}>Export definition</button>
+          <button disabled={!editable || !configValid || persistence.busy} onClick={()=>importFile.current?.click()}>Import definition</button>
+          <input ref={importFile} type="file" accept="application/json,.json" hidden onChange={event=>{const file=event.target.files?.[0];if(file)void importDefinition(file);event.target.value='';}}/>
+          <button disabled={!editable || !configValid || persistence.busy || !persistence.dirty && !!persistence.flow} onClick={() => void persistence.save()}>{persistence.busy ? t('Please wait…', 'Espera…') : t('Save draft', 'Guardar borrador')}</button>
+          <button disabled={!editable || !configValid || persistence.busy || !persistence.flow || persistence.dirty} onClick={() => void persistence.publish()}>{t('Publish version', 'Publicar versión')}</button>
           {persistence.flow && <button className="secondary-button" disabled={!editable || persistence.busy} onClick={persistence.newCopy}>{t('Copy into a new flow', 'Copiar a un flujo nuevo')}</button>}
           {persistence.flow && <button className="secondary-button" disabled={!ready || persistence.busy} onClick={() => void persistence.loadFlow(persistence.flow!.id)}>{t('Reload server draft', 'Recargar borrador del servidor')}</button>}
         </div>
@@ -154,7 +168,7 @@ function Playground() {
       <fieldset className="flow-editor" disabled={!ready}>
       <div className="tools" aria-label={t("Add steps", "Agregar pasos")}>
         {kinds.map((k) => (
-          <button key={k} disabled={!editable || steps.length >= 200} onClick={() => add(k)}>
+          <button key={k} disabled={!editable || !configValid || steps.length >= 200} onClick={() => add(k)}>
             + {kindLabel(k)}
           </button>
         ))}
@@ -202,8 +216,9 @@ function Playground() {
               className="node"
               style={{ left: step.x, top: step.y }}
               aria-pressed={step.id === selected}
-              onClick={() => select(step.id)}
+              onClick={() => {if(configValid)select(step.id);}}
               onPointerDown={(e) => {
+                if (!configValid) return;
                 select(step.id);
                 if (!editable) return;
                 e.currentTarget.setPointerCapture(e.pointerId);
@@ -263,9 +278,10 @@ function Playground() {
                   onChange={(e) => patch({ text: e.target.value })}
                 />
               </label>
+              <NodeConfigEditor key={active.id} kind={active.kind} config={active.config} onChange={config=>patch({config})} onValidity={setConfigValid}/>
               {active.choices.map((choice, i) => (
                 <div className="edge" key={i}>
-                  {active.kind === 'Menu' && (
+                  {(active.kind === 'Menu' || active.kind==='Condition') && (
                     <label>
                       {t("Reply", "Respuesta")} {i + 1}
                       <input
@@ -355,7 +371,7 @@ function Playground() {
         </fieldset></article>
         <article>
           <h2>{t("Customer preview", "Vista del cliente")}</h2>
-          <button
+          <button disabled={!configValid}
             onClick={() => {
               const issue = validateFlow(steps);
               setError(issue);
@@ -373,11 +389,14 @@ function Playground() {
             ))}
             {current?.kind === 'Menu' &&
               current.choices.map((choice, i) => (
-                <button key={i} onClick={() => play(choice.to, choice.label)}>
+                <button key={i} onClick={() => play(current.id, choice.label)}>
                   {choice.label}
                 </button>
               ))}
-            {current?.kind === 'End' && <small>{t("Conversation ended", "Conversación finalizada")}</small>}
+            {result?.state==='waiting'&&current?.kind!=='Menu'&&<form onSubmit={e=>{e.preventDefault();play(at,answer);}}><label>Customer answer<input value={answer} onChange={e=>setAnswer(e.target.value)}/></label><button>Reply</button></form>}
+            {result?.state==='paused'&&<p>Automation paused for human attention. No real notification or order was created by this preview.</p>}
+            {result&&<details><summary>Simulation variables</summary><pre>{JSON.stringify(variables,null,2)}</pre></details>}
+            {result?.state==='completed' && <small>{t("Conversation ended", "Conversación finalizada")}</small>}
           </div>
         </article>
       </div>

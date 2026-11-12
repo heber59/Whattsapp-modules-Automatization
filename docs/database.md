@@ -1,60 +1,42 @@
 # Database
 
-PostgreSQL uses a private app schema accessed through NestJS. Supabase Auth manages identities and credentials; app.users stores application profiles without passwords.
+PostgreSQL uses a private `app` schema accessed by NestJS. Supabase Auth owns identities and credentials; application profiles contain no passwords.
 
-```mermaid
-erDiagram
-    SUPABASE_AUTH ||--o| USERS : identifies
-    USERS ||--o{ MEMBERSHIPS : joins
-    BUSINESSES ||--|{ MEMBERSHIPS : authorizes
-    BUSINESSES ||--o{ WHATSAPP_NUMBERS : connects
-    BUSINESSES ||--o{ PRODUCTS : sells
-```
-
-| Implemented table | Main fields and constraints |
+| Tables | Purpose |
 | --- | --- |
-| users | UUID id, unique auth_user_id, optional email. Identity comes from the verified session. |
-| businesses | id, name, created_by. Business creation and owner membership share a transaction. |
-| memberships | Composite business_id + user_id key; owner/admin/operator role. Users may join several businesses. |
-| whatsapp_numbers | business_id, unique E.164 phone, optional unique Meta phone ID, status. Multiple numbers per business. |
-| products | business_id, name, nonnegative decimal price, COP currency, active flag. Multiple products per business. |
-| schema_migrations | Version, checksum, and application date. Never edit applied migrations. |
-| commercial_requests | Contact/plan requests, verified auth user ID for purchases, email/phone, consent timestamp, pending/contacted/closed status. No payment credentials. |
-| flows / flow_versions | Business-scoped drafts with optimistic revisions; immutable numbered publication snapshots. See [flows](flows.md). |
+| users, businesses, memberships | Verified identities and owner/admin/operator business access. |
+| whatsapp_numbers, products | Original phone/product storage foundations; not the source of flow-embedded product options. |
+| commercial_requests | Consent-bearing contact/plan requests, follow-up state; no payment credentials. |
+| flows, flow_versions | Revision-protected drafts and immutable publication snapshots. |
+| whatsapp_channels | Pilot phone routing to a business and published flow version. |
+| whatsapp_inbox | Deduplicated inbound events with ordered ingest sequence. |
+| whatsapp_conversations | Pinned flow version, execution checkpoint, variables, state, last inbound time, explicit operator pause. |
+| whatsapp_outbox | Ordered text/media payloads, expiry, attempts, operator reply marker, delivery/review state. |
+| whatsapp_status_events | Provider delivery callbacks. |
+| flow_orders | Flow-defined data snapshots, total when provided, currency, pending approval/confirmed/cancelled state. |
+| operation_notifications | Inbox entries with configured recipient/text, read timestamp, optional template payload, attempts, dispatch state, and provider acknowledgement. |
+| schema_migrations | Migration checksum and application date. |
 
-## Isolation
-- Business queries filter by the authenticated user's membership.
-- Products and phone numbers have unique business_id + id keys to support future composite foreign keys and prevent cross-business references.
-- RLS is enabled without direct-access policies. The schema is not exposed to browsers.
-- Table owners and privileged roles can bypass RLS. NestJS authorization remains mandatory; design policies before enabling direct client access.
-- WhatsApp buyers will be contacts, distinct from SaaS customers who sign in.
+## Integrity and isolation
 
-## Future model: tables not implemented yet
-```text
-Business
-├── Contacts → conversations → messages
-├── Orders → items with historical name and price
-├── Flows → published versions → executions
-└── Inbox/outbox for idempotent events and actions
-Account or business → subscription → charges  # Billing scope undecided
-```
+Business reads/actions require authenticated membership. Composite references bind flow versions and WhatsApp conversations to the correct business. Orders reference their conversation and source inbound event. Unique `(inbox_id,step_id)` constraints deduplicate order and notification actions; `(inbox_id,sequence)` deduplicates outbound actions.
 
-Whether one subscription covers one or several businesses remains undecided. Billing is not implemented. Product variants, stock, and carrier integrations are outside this migration.
+Flow execution writes its checkpoint, variables, orders, notifications, and outbound work in one transaction. Operator actions serialize against execution. Human decisions persist `orderStatus` for configurable downstream branches. Order data snapshots preserve configured values; the platform does not impose universal customer fields or inventory rules.
+
+RLS is enabled without direct browser policies, and PUBLIC access is revoked. Privileged table owners can bypass RLS, so backend authorization is mandatory. Do not expose these tables through browser APIs.
+
+Notifications default to internal records. Optional external WhatsApp templates use pending/sending/sent/retry/manual_review/failed/discarded states. Sent records API acceptance, not device delivery. Ambiguous or stale claims require owner/admin review and are never automatically resent. Original product rows do not implement inventory synchronization. Billing and generalized contacts/assignment remain future work.
 
 ## Migrations
-From the repository root, with local PostgreSQL running:
+
+Versioned SQL lives in `apps/api/migrations`. Migration execution uses locks, transactions, and checksums. Never edit an applied migration. Startup does not apply migrations automatically.
+
 ```bash
 corepack pnpm db:migrate
 ```
 
-Versioned SQL lives in apps/api/migrations with locks, transactions, and checksums. Run migrations explicitly; startup does not apply them. Applied migrations 004–005 add flow publications and private WhatsApp channels, inbox, outbox, conversations, and delivery events. See [WhatsApp](whatsapp.md).
+Migrations 001–005 define the existing foundation and WhatsApp pilot. Migration 006 adds variables, operator pause, media payloads, orders, and notifications. Migration 007 adds durable external-template delivery. Both were verified against isolated local test infrastructure; application to the existing configured database remains pending. Back up and review the target before rollout.
 
 ## Consultation follow-up
 
-After migrations 002 and 003, the operator uses a trusted PostgreSQL session with app-schema access to review requests:
-```sql
-SELECT id, kind, email, phone, name, message, plan, created_at
-FROM app.commercial_requests
-WHERE status = 'pending_contact' ORDER BY created_at;
-```
-Record follow-up by updating that request's status to contacted or closed. There is no public lead-list endpoint or automatic notification. Restrict database access to the operator; do not expose this table through Supabase browser APIs.
+Review `app.commercial_requests` through trusted database access and mark requests contacted or closed. There is no public lead-list endpoint or automatic commercial notification.
