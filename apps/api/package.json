@@ -9,10 +9,10 @@
     "start": "node dist/main.js",
     "start:worker": "node dist/worker.js",
     "typecheck": "tsc --noEmit",
-    "test": "node --require ts-node/register --test src/shared/config/config.spec.ts",
+    "test": "node --require ts-node/register --test src/shared/config/config.spec.ts src/modules/auth/auth.spec.ts src/modules/commercial/commercial.spec.ts src/modules/flows/flows.rules.spec.ts src/modules/whatsapp/whatsapp.engine.spec.ts",
     "test:e2e": "node --require ts-node/register --test test/*.e2e-spec.ts",
     "lint": "eslint src test --max-warnings=0",
-    "test:e2e:api": "node --require ts-node/register --test test/health.e2e-spec.ts test/security.e2e-spec.ts test/http-config.e2e-spec.ts",
+    "test:e2e:api": "node --require ts-node/register --test test/health.e2e-spec.ts test/security.e2e-spec.ts test/http-config.e2e-spec.ts test/whatsapp.e2e-spec.ts",
     "test:e2e:worker": "node --require ts-node/register --test test/worker.e2e-spec.ts",
     "db:migrate": "ts-node src/shared/database/migrate.ts"
   },
@@ -22,8 +22,8 @@
     "@nestjs/platform-express": "12.4.0",
     "@nestjs/config": "12.1.1",
     "@wa/contracts": "workspace:*",
-    "bullmq": "5.81.5",
-    "ioredis": "^5.8.0",
+    "bullmq": "6.7.2",
+    "ioredis": "^6.0.0",
     "pg": "^8.16.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
@@ -32,7 +32,7 @@
     "@nestjs/swagger": "12.1.1"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
+    "@types/node": "^26.6.6",
     "@types/pg": "^8.15.0",
     "ts-node": "10.9.2",
     "typescript": "5.9.3",

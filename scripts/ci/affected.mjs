@@ -24,8 +24,6 @@ export function affected(files) {
       const apiOnly = file.startsWith('apps/api/src/health/')
         || file.startsWith('apps/api/src/shared/auth/')
         || file.startsWith('apps/api/src/modules/auth/')
-        || file.startsWith('apps/api/src/modules/identity/')
-        || file.startsWith('apps/api/src/modules/businesses/')
         || file === 'apps/api/test/security.e2e-spec.ts'
         || ['apps/api/src/main.ts', 'apps/api/src/configure-http.ts', 'apps/api/src/app.module.ts', 'apps/api/test/health.e2e-spec.ts'].includes(file);
       const workerOnly = [

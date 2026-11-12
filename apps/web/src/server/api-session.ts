@@ -5,7 +5,8 @@ const accessCookie = 'wa-access';
 const refreshCookie = 'wa-refresh';
 const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/' };
 type Session = { access_token: string; refresh_token: string; expires_in: number };
-type BusinessPath = '/businesses' | `/businesses/${string}`;
+type BusinessPath = '/identity/me' | '/businesses' | `/businesses/${string}` | '/commercial/purchase-requests';
+type AuthenticatedMethod = 'GET' | 'POST' | 'PATCH';
 class InvalidRequest extends Error {}
 
 function configuration() {
@@ -54,7 +55,7 @@ function checkOrigin(request: NextRequest, mutate: boolean): NextResponse | unde
   }
 }
 
-async function json(request: NextRequest): Promise<unknown> {
+async function json(request: NextRequest, limit = 16384): Promise<unknown> {
   const reader = request.body?.getReader();
   if (!reader) throw new InvalidRequest();
   const chunks: Uint8Array[] = [];
@@ -63,14 +64,14 @@ async function json(request: NextRequest): Promise<unknown> {
     const chunk = await reader.read();
     if (chunk.done) break;
     size += chunk.value.byteLength;
-    if (size > 16384) { await reader.cancel(); throw new InvalidRequest(); }
+    if (size > limit) { await reader.cancel(); throw new InvalidRequest(); }
     chunks.push(chunk.value);
   }
   try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); }
   catch { throw new InvalidRequest(); }
 }
 
-async function upstream(path: string, method: 'GET' | 'POST', body?: unknown, token?: string): Promise<Response> {
+async function upstream(path: string, method: AuthenticatedMethod, body?: unknown, token?: string): Promise<Response> {
   const config = configuration();
   return fetch(config.api + path, {
     method, cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(10000),
@@ -87,7 +88,7 @@ function failure(response: Response): NextResponse {
   const status = [400, 401, 403, 404, 409, 429].includes(response.status) ? response.status : 503;
   const messages: Record<number, string> = {
     400: 'Invalid request', 401: 'Invalid or expired session', 403: 'Access denied',
-    404: 'Business not found', 409: 'Request conflicts with current data', 429: 'Too many requests; try again later',
+    404: 'Requested resource not found', 409: 'Request conflicts with current data', 429: 'Too many requests; try again later',
   };
   const result = reply({ message: messages[status] ?? 'Service is temporarily unavailable' }, status);
   const retry = response.headers.get('retry-after');
@@ -170,12 +171,37 @@ export async function logout(request: NextRequest): Promise<NextResponse> {
 }
 
 export async function businesses(request: NextRequest, path: BusinessPath, method: 'GET' | 'POST'): Promise<NextResponse> {
+  return authenticatedRequest(request, path, method);
+}
+
+export async function whatsapp(request: NextRequest, businessId: string, method: 'GET' | 'POST'): Promise<NextResponse> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(businessId)) {
+    return reply({ message: 'Invalid business identifier' }, 400);
+  }
+  return authenticatedRequest(request, `/businesses/${businessId}/whatsapp`, method, true);
+}
+
+export async function flows(request: NextRequest, path: string, method: AuthenticatedMethod): Promise<NextResponse> {
+  const uuid = '[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';
+  const collection = new RegExp(`^/businesses/${uuid}/flows$`, 'i');
+  const item = new RegExp(`^/businesses/${uuid}/flows/${uuid}$`, 'i');
+  const publish = new RegExp(`^/businesses/${uuid}/flows/${uuid}/publish$`, 'i');
+  const version = new RegExp(`^/businesses/${uuid}/flows/${uuid}/versions/[1-9][0-9]{0,8}$`, 'i');
+  if (!((collection.test(path) && (method === 'GET' || method === 'POST'))
+    || (item.test(path) && (method === 'GET' || method === 'PATCH'))
+    || (publish.test(path) && method === 'POST') || (version.test(path) && method === 'GET'))) {
+    return reply({ message: 'Invalid flow request' }, 400);
+  }
+  return authenticatedRequest(request, path, method, true);
+}
+
+async function authenticatedRequest(request: NextRequest, path: string, method: AuthenticatedMethod, flowPath = false): Promise<NextResponse> {
   let refreshed: Session | undefined;
   try {
-    const rejected = checkOrigin(request, method === 'POST');
+    const rejected = checkOrigin(request, method !== 'GET');
     if (rejected) return rejected;
-    if (path !== '/businesses' && !/^\/businesses\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(path)) return reply({ message: 'Invalid business identifier' }, 400);
-    const body = method === 'POST' ? await json(request) : undefined;
+    if (!flowPath && path !== '/identity/me' && path !== '/businesses' && path !== '/commercial/purchase-requests' && !/^\/businesses\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(path)) return reply({ message: 'Invalid business identifier' }, 400);
+    const body = method !== 'GET' ? await json(request, flowPath ? 65536 : 16384) : undefined;
     let token = request.cookies.get(accessCookie)?.value;
     if (!token) {
       const renewal = await renew(request);
@@ -196,5 +222,20 @@ export async function businesses(request: NextRequest, path: BusinessPath, metho
   } catch (error) {
     const response = reply({ message: error instanceof InvalidRequest ? 'Invalid JSON request' : 'Service is temporarily unavailable' }, error instanceof InvalidRequest ? 400 : 503);
     return refreshed ? store(response, refreshed) : response;
+  }
+}
+
+export async function publicRequest(request: NextRequest, action: 'signup' | 'leads' | 'plans'): Promise<NextResponse> {
+  try {
+    const mutate = action !== 'plans';
+    const rejected = checkOrigin(request, mutate);
+    if (rejected) return rejected;
+    const path = action === 'signup' ? '/auth/web/signup' : '/commercial/' + action;
+    const response = await upstream(path, mutate ? 'POST' : 'GET', mutate ? await json(request) : undefined);
+    if (!response.ok) return failure(response);
+    if (action === 'signup') return reply({ status: 'signup_requested' });
+    return reply(await response.json(), response.status);
+  } catch (error) {
+    return reply({ message: error instanceof InvalidRequest ? 'Invalid JSON request' : 'Service is temporarily unavailable' }, error instanceof InvalidRequest ? 400 : 503);
   }
 }

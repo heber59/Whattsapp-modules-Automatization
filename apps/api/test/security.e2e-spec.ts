@@ -23,6 +23,15 @@ async function fixture(overrides: Record<string, unknown> = {}) {
   const provider = createServer(async (request, response) => {
     providerCalls++;
     response.setHeader('Content-Type', 'application/json');
+    if (request.url?.startsWith('/auth/v1/signup')) {
+      let raw = '';
+      for await (const chunk of request) raw += String(chunk);
+      const input = JSON.parse(raw) as { email: string; password: string };
+      assert.equal(input.password.length >= 8, true);
+      response.end(JSON.stringify({ id: randomUUID(), email: input.email, aud: 'authenticated',
+        created_at: '2026-01-01T00:00:00Z', app_metadata: {}, user_metadata: {} }));
+      return;
+    }
     if (request.url?.startsWith('/auth/v1/token')) {
       let raw = '';
       for await (const chunk of request) raw += String(chunk);
@@ -128,9 +137,9 @@ async function fixture(overrides: Record<string, unknown> = {}) {
     const redis = new Redis(base.REDIS_URL, { maxRetriesPerRequest: 1, commandTimeout: 3000 });
     cleanup.add(() => redis.disconnect());
     redis.on('error', () => {});
-    const request = (url: string, token?: string, body?: unknown, headers: Record<string, string> = {}) =>
+    const request = (url: string, token?: string, body?: unknown, headers: Record<string, string> = {}, method?: string) =>
       fetch(app.getHttpServer().address() ? 'http://127.0.0.1:' + (app.getHttpServer().address() as AddressInfo).port + url : '', {
-        method: body === undefined ? 'GET' : 'POST',
+        method: method ?? (body === undefined ? 'GET' : 'POST'),
         headers: { ...(token ? { Authorization: 'Bearer ' + token } : {}), 'Content-Type': 'application/json', ...headers },
         body: body === undefined ? undefined : JSON.stringify(body),
       });
@@ -159,6 +168,79 @@ async function fixture(overrides: Record<string, unknown> = {}) {
 
 test('failed initialization fixture probe', { skip: !process.env.WA_FIXTURE_FAILURE_PROBE }, async () => {
   await assert.rejects(fixture({ DATABASE_URL: 'postgresql://test:test@127.0.0.1:1/test' }), { code: 'ECONNREFUSED' });
+});
+
+test('Flow drafts isolate businesses, enforce roles and revisions, and publish immutable versions atomically', async () => {
+  const f = await fixture({ RATE_LIMIT_USER_LIMIT: 200 });
+  try {
+    const business = await (await f.request('/businesses', 'alice', { name: 'Flow fixture' })).json() as { id: string };
+    const path = '/businesses/' + business.id + '/flows';
+    assert.equal((await f.request(path)).status, 401);
+    assert.equal((await f.request(path, 'bob')).status, 404);
+    const created = await (await f.request(path, 'alice', { name: 'Incomplete', steps: [] })).json() as { flow: { id: string; revision: number } };
+    const flowPath = path + '/' + created.flow.id;
+    assert.equal(created.flow.revision, 1);
+    assert.equal((await f.request(flowPath + '/publish', 'alice', { expectedRevision: 1 })).status, 400);
+    await f.request('/identity/me', 'bob');
+    await f.database.query(`INSERT INTO app.memberships(business_id,user_id,role)
+      SELECT $1,id,'operator' FROM app.users WHERE auth_user_id=$2`, [business.id, f.identities.bob]);
+    assert.equal((await f.request(flowPath, 'bob')).status, 200);
+    assert.equal((await f.request(path, 'bob', { name: 'Denied', steps: [] })).status, 403);
+    assert.equal((await f.request(flowPath, 'bob', { name: 'Denied', steps: [], expectedRevision: 1 }, {}, 'PATCH')).status, 403);
+    assert.equal((await f.request(flowPath + '/publish', 'bob', { expectedRevision: 1 })).status, 403);
+    const steps = [
+      { id: 's', kind: 'Start', text: 'Hi', x: 0, y: 0, choices: [{ label: 'Next', to: 'e' }] },
+      { id: 'e', kind: 'End', text: 'Bye', x: 100, y: 0, choices: [] },
+    ];
+    const saves = await Promise.all([1, 2].map(() => f.request(flowPath, 'alice', { name: 'Saved', steps, expectedRevision: 1 }, {}, 'PATCH')));
+    assert.deepEqual(saves.map((response) => response.status).sort(), [200, 409]);
+    const published = await Promise.all([1, 2].map(async () => {
+      const response = await f.request(flowPath + '/publish', 'alice', { expectedRevision: 2 });
+      assert.equal(response.status, 201);
+      return response.json() as Promise<{ version: { version: number; sourceRevision: number; steps: unknown[] } }>;
+    }));
+    assert.deepEqual(published[0], published[1]);
+    assert.equal(published[0]!.version.version, 1);
+    assert.equal(published[0]!.version.sourceRevision, 2);
+    assert.equal((await f.request(flowPath, 'alice', { name: 'Changed draft', steps: [], expectedRevision: 2 }, {}, 'PATCH')).status, 200);
+    const version = await f.request(flowPath + '/versions/1', 'bob');
+    assert.deepEqual(await version.json(), published[0]);
+    assert.deepEqual(await (await f.request(flowPath + '/publish', 'alice', { expectedRevision: 2 })).json(), published[0]);
+    assert.equal((await f.request(flowPath + '/publish', 'alice', { expectedRevision: 1 })).status, 409);
+    await assert.rejects(f.database.query("UPDATE app.flow_versions SET name='tamper' WHERE business_id=$1", [business.id]), /immutable/);
+    const other = await (await f.request('/businesses', 'bob', { name: 'Other business' })).json() as { id: string };
+    assert.equal((await f.request('/businesses/' + other.id + '/flows/' + created.flow.id, 'bob')).status, 404);
+    await f.database.query("UPDATE app.memberships SET role='admin' WHERE business_id=$1 AND user_id=(SELECT id FROM app.users WHERE auth_user_id=$2)", [business.id, f.identities.bob]);
+    assert.equal((await f.request(flowPath, 'bob', { name: 'Admin edit', steps, expectedRevision: 3 }, {}, 'PATCH')).status, 200);
+    const v2 = await (await f.request(flowPath + '/publish', 'bob', { expectedRevision: 4 })).json() as { version: { version: number } };
+    assert.equal(v2.version.version, 2);
+  } finally { await f.close(); }
+});
+
+test('Signup and commercial requests preserve credentials and authenticated purchase boundaries', async () => {
+  const f = await fixture();
+  const email = randomUUID() + '@example.invalid';
+  try {
+    const signup = await f.request('/auth/web/signup', undefined, { email, password: 'password123' },
+      { 'x-web-auth-key': 'test-web-auth-secret-at-least-32-characters' });
+    assert.equal(signup.status, 200);
+    assert.deepEqual(await signup.json(), { status: 'signup_requested' });
+    assert.equal((await f.request('/auth/web/signup', undefined, { email, password: 'password123' })).status, 401);
+    assert.equal((await f.request('/commercial/leads', undefined, { email, consent: true })).status, 201);
+    assert.equal((await f.request('/commercial/purchase-requests', undefined, { email, consent: true, plan: 'full-access' })).status, 401);
+    const purchase = await f.request('/commercial/purchase-requests', 'alice', { email, consent: true, plan: 'full-access' });
+    assert.equal(purchase.status, 201);
+    assert.deepEqual(await purchase.json(), { status: 'pending_contact' });
+    const rows = await f.database.query('SELECT kind, status, auth_user_id, plan FROM app.commercial_requests WHERE email = $1 ORDER BY kind', [email]);
+    assert.equal(rows.rowCount, 2);
+    assert.equal(rows.rows[0]?.auth_user_id, null);
+    assert.equal(rows.rows[1]?.auth_user_id, f.identities.alice);
+    assert.equal(rows.rows[1]?.status, 'pending_contact');
+    assert.equal(rows.rows[1]?.plan, 'full-access');
+  } finally {
+    await f.database.query('DELETE FROM app.commercial_requests WHERE email = $1', [email]);
+    await f.close();
+  }
 });
 
 test('failed fixture initialization releases sockets and exits without forced shutdown', { timeout: 20000 }, () => {

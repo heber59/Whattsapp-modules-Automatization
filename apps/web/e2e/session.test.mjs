@@ -15,6 +15,8 @@ async function listen(server) {
 test('merchant cookies survive reload, renew, isolate businesses and clear on logout', { timeout: 30000 }, async (t) => {
   const key = randomUUID();
   const businesses = new Map();
+  const flows = new Map();
+  const profiles = new Map();
   const current = new Map();
   const sessions = new Map();
   let renewals = 0;
@@ -36,8 +38,11 @@ test('merchant cookies survive reload, renew, isolate businesses and clear on lo
     let raw = '';
     for await (const chunk of req) raw += chunk;
     const body = raw ? JSON.parse(raw) : {};
+    if (req.url === '/commercial/plans') return send(200, { plans: [{ id: 'full-access', name: 'Full access', price: 50000, currency: 'COP', interval: 'month' }], checkoutAvailable: false });
+    if (req.url === '/commercial/leads') return send(201, { status: 'received' });
     if (req.url.startsWith('/auth/web/')) {
       if (req.headers['x-web-auth-key'] !== key) return send(403, {});
+      if (req.url === '/auth/web/signup') return send(200, { status: 'signup_requested', access_token: 'must-not-leak', refresh_token: 'must-not-leak' });
       if (req.url === '/auth/web/recover/request') {
         recoveryRequests++;
         if (body.email === 'limited@example.invalid') {
@@ -70,6 +75,11 @@ test('merchant cookies survive reload, renew, isolate businesses and clear on lo
     }
     const email = current.get(req.headers.authorization?.slice(7));
     if (!email) return send(401, {});
+    if (req.url === '/commercial/purchase-requests') return send(201, { status: 'pending_contact' });
+    if (req.url === '/identity/me') {
+      if (!profiles.has(email)) profiles.set(email, randomUUID());
+      return send(200, { id: profiles.get(email) });
+    }
     const owned = businesses.get(email) ?? [];
     if (req.url === '/businesses' && req.method === 'POST') {
       const business = { id: randomUUID(), name: body.name, role: 'owner' };
@@ -77,6 +87,34 @@ test('merchant cookies survive reload, renew, isolate businesses and clear on lo
       return send(201, business);
     }
     if (req.url === '/businesses') return send(200, owned);
+    const channelRoute = /^\/businesses\/([^/]+)\/whatsapp$/.exec(req.url);
+    if (channelRoute) {
+      if (!owned.some(business => business.id === channelRoute[1])) return send(404, {});
+      return send(req.method === 'POST' ? 201 : 200, {
+        channel: req.method === 'POST' ? { phoneNumberId: '123456', flowId: body.flowId, version: body.version, status: 'configured' } : null,
+        configuration: { ready: true, missing: [] }, webhookPath: '/webhooks/whatsapp',
+      });
+    }
+    const flowRoute = /^\/businesses\/([^/]+)\/flows(?:\/([^/]+))?(?:\/(publish|versions)\/?([0-9]+)?)?$/.exec(req.url);
+    if (flowRoute) {
+      const [, businessId, flowId, action, versionNumber] = flowRoute;
+      if (!owned.some(business => business.id === businessId)) return send(404, {});
+      const records = flows.get(businessId) ?? [];
+      if (!flowId) {
+        if (req.method === 'GET') return send(200, { flows: records });
+        const flow = { id: randomUUID(), businessId, name: body.name, steps: [], revision: 1 };
+        flows.set(businessId, [...records, flow]);
+        return send(201, { flow });
+      }
+      const flow = records.find(record => record.id === flowId);
+      if (!flow) return send(404, {});
+      if (action === 'versions') return send(200, { version: { number: Number(versionNumber), steps: [] } });
+      if (req.method === 'GET') return send(200, { flow });
+      if (body.expectedRevision !== flow.revision) return send(409, {});
+      if (action === 'publish') return send(201, { version: { number: 1, steps: flow.steps } });
+      Object.assign(flow, { name: body.name, steps: body.steps, revision: flow.revision + 1 });
+      return send(200, { flow });
+    }
     const business = owned.find((row) => req.url === '/businesses/' + row.id);
     return send(business ? 200 : 404, business ?? {});
   });
@@ -106,9 +144,9 @@ test('merchant cookies survive reload, renew, isolate businesses and clear on lo
 
   function browser() {
     const jar = new Map();
-    return async (path, body, source = origin) => {
+    return async (path, body, source = origin, method = body === undefined ? 'GET' : 'POST') => {
       const response = await fetch(origin + '/api/' + path, {
-        method: body === undefined ? 'GET' : 'POST',
+        method,
         headers: { Origin: source, 'Content-Type': 'application/json', Cookie: [...jar].map(([k, v]) => k + '=' + v).join('; ') },
         body: body === undefined ? undefined : JSON.stringify(body),
       });
@@ -126,16 +164,71 @@ test('merchant cookies survive reload, renew, isolate businesses and clear on lo
     };
   }
   const alice = browser(), bob = browser();
+  const visitor = browser();
+  assert.equal((await visitor('session/signup', {}, 'https://unrelated.invalid')).status, 403);
+  const signup = await visitor('session/signup', { email: 'new@example.invalid', password: 'fixture password' });
+  assert.equal(signup.status, 200);
+  assert.deepEqual(await signup.json(), { status: 'signup_requested' });
+  assert.equal(signup.headers.getSetCookie().length, 0);
+  assert.equal((await visitor('commercial/leads', {}, 'https://unrelated.invalid')).status, 403);
+  const lead = await visitor('commercial/leads', { email: 'visitor@example.invalid', consent: true });
+  assert.equal(lead.status, 201);
+  assert.equal(lead.headers.get('cache-control'), 'no-store');
+  assert.deepEqual(await lead.json(), { status: 'received' });
+  const catalog = await visitor('commercial/plans');
+  assert.equal(catalog.status, 200);
+  assert.equal((await catalog.json()).plans[0].price, 50000);
+  assert.equal((await visitor('commercial/purchase-requests', { plan: 'full-access', email: 'visitor@example.invalid', consent: true })).status, 401);
+  assert.equal((await alice('session')).status, 401);
   for (const [client, email] of [[alice, 'alice@example.invalid'], [bob, 'bob@example.invalid']]) {
     const login = await client('session/login', { email, password: 'fixture password' });
     assert(login.ok, 'login status ' + login.status);
     assert.doesNotMatch(await login.text(), /access_token|refresh_token/);
+    const identity = await client('session');
+    assert.equal(identity.status, 200);
+    assert.equal((await identity.json()).id, profiles.get(email));
+    assert.equal(identity.headers.get('cache-control'), 'no-store');
     assert.deepEqual(await (await client('businesses')).json(), []);
   }
   assert.equal((await alice('businesses', { name: 'Unexpected' }, 'https://unrelated.invalid')).status, 403);
+  const purchase = await alice('commercial/purchase-requests', { plan: 'full-access', email: 'alice@example.invalid', consent: true });
+  assert.equal(purchase.status, 201);
+  assert.deepEqual(await purchase.json(), { status: 'pending_contact' });
   const created = await alice('businesses', { name: 'Pilot shop' });
   assert(created.ok);
   const { id } = await created.json();
+  const flowPath = 'businesses/' + id + '/flows';
+  const channelPath = 'businesses/' + id + '/whatsapp';
+  assert.equal((await visitor(channelPath)).status, 401);
+  assert.equal((await bob(channelPath)).status, 404);
+  assert.equal((await alice(channelPath, {}, 'https://unrelated.invalid')).status, 403);
+  const channelStatus = await alice(channelPath);
+  assert.equal(channelStatus.status, 200);
+  assert.equal(channelStatus.headers.get('cache-control'), 'no-store');
+  assert.deepEqual((await channelStatus.json()).configuration, { ready: true, missing: [] });
+  assert.equal((await visitor(flowPath)).status, 401);
+  assert.equal((await bob(flowPath)).status, 404);
+  assert.equal((await alice(flowPath, { name: 'Menu' }, 'https://unrelated.invalid')).status, 403);
+  const createFlow = await alice(flowPath, { name: 'Menu' });
+  assert.equal(createFlow.status, 201);
+  const { flow } = await createFlow.json();
+  const channelSaved = await alice(channelPath, { flowId: flow.id, version: 1 });
+  assert.equal(channelSaved.status, 201);
+  assert.doesNotMatch(await channelSaved.text(), /access_token|app_secret|verify_token/);
+  const itemPath = flowPath + '/' + flow.id;
+  assert.equal((await alice(itemPath, {}, 'https://unrelated.invalid', 'PATCH')).status, 403);
+  assert.equal((await alice(itemPath, { name: 'x'.repeat(70000) }, origin, 'PATCH')).status, 400);
+  const saved = await alice(itemPath, { name: 'Saved menu', steps: [], expectedRevision: 1 }, origin, 'PATCH');
+  assert.equal(saved.status, 200);
+  assert.equal((await saved.json()).flow.revision, 2);
+  assert.equal((await alice(itemPath, { name: 'Stale', steps: [], expectedRevision: 1 }, origin, 'PATCH')).status, 409);
+  const persisted = await alice(itemPath);
+  assert.equal(persisted.headers.get('cache-control'), 'no-store');
+  assert.equal((await persisted.json()).flow.name, 'Saved menu');
+  assert.equal((await alice(itemPath + '/publish', { expectedRevision: 2 })).status, 201);
+  assert.equal((await alice(itemPath + '/versions/1')).status, 200);
+  assert.equal((await bob(itemPath)).status, 404);
+  assert.equal((await alice(flowPath + '/invalid-id')).status, 400);
   current.clear();
   assert.equal((await (await alice('businesses/' + id)).json()).name, 'Pilot shop');
   assert.equal(renewals, 1);

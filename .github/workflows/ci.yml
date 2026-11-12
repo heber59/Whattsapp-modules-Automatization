@@ -108,7 +108,7 @@ jobs:
       - name: Prepare delivery
         if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
         run: pnpm package:web
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
         with:
           name: web-${{ github.sha }}
@@ -168,7 +168,7 @@ jobs:
       - name: Prepare delivery
         if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
         run: pnpm package:api
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
         with:
           name: api-${{ github.sha }}
@@ -188,6 +188,19 @@ jobs:
       DATABASE_URL: postgresql://wa:ci_local_password@127.0.0.1:5432/wa
       REDIS_URL: redis://127.0.0.1:6379
     services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: wa
+          POSTGRES_PASSWORD: ci_local_password
+          POSTGRES_DB: wa
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U wa -d wa"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 20
       redis:
         image: redis:7-alpine
         ports:
@@ -215,7 +228,7 @@ jobs:
       - name: Prepare delivery
         if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
         run: pnpm package:worker
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')
         with:
           name: worker-${{ github.sha }}
