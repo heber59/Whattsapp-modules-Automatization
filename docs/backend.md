@@ -2,6 +2,8 @@
 
 A NestJS + TypeScript modular monolith with single-responsibility services and lightweight hexagonal boundaries. Modules communicate through internal operations. A separate worker process reuses modules for background work.
 
+Commercial endpoints: public GET /commercial/plans and POST /commercial/leads; authenticated POST /commercial/purchase-requests. Requests require consent and email or international phone. PostgreSQL stores pending requests; no email notification is sent. One full-access plan costs COP 50,000 monthly. Checkout, charges, subscriptions, and paid entitlements remain pending provider configuration.
+
 Target structure:
 
 ```text

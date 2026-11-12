@@ -5,7 +5,7 @@ const accessCookie = 'wa-access';
 const refreshCookie = 'wa-refresh';
 const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/' };
 type Session = { access_token: string; refresh_token: string; expires_in: number };
-type BusinessPath = '/identity/me' | '/businesses' | `/businesses/${string}`;
+type BusinessPath = '/identity/me' | '/businesses' | `/businesses/${string}` | '/commercial/purchase-requests';
 class InvalidRequest extends Error {}
 
 function configuration() {
@@ -87,7 +87,7 @@ function failure(response: Response): NextResponse {
   const status = [400, 401, 403, 404, 409, 429].includes(response.status) ? response.status : 503;
   const messages: Record<number, string> = {
     400: 'Invalid request', 401: 'Invalid or expired session', 403: 'Access denied',
-    404: 'Business not found', 409: 'Request conflicts with current data', 429: 'Too many requests; try again later',
+    404: 'Requested resource not found', 409: 'Request conflicts with current data', 429: 'Too many requests; try again later',
   };
   const result = reply({ message: messages[status] ?? 'Service is temporarily unavailable' }, status);
   const retry = response.headers.get('retry-after');
@@ -174,7 +174,7 @@ export async function businesses(request: NextRequest, path: BusinessPath, metho
   try {
     const rejected = checkOrigin(request, method === 'POST');
     if (rejected) return rejected;
-    if (path !== '/identity/me' && path !== '/businesses' && !/^\/businesses\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(path)) return reply({ message: 'Invalid business identifier' }, 400);
+    if (path !== '/identity/me' && path !== '/businesses' && path !== '/commercial/purchase-requests' && !/^\/businesses\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(path)) return reply({ message: 'Invalid business identifier' }, 400);
     const body = method === 'POST' ? await json(request) : undefined;
     let token = request.cookies.get(accessCookie)?.value;
     if (!token) {
@@ -196,5 +196,20 @@ export async function businesses(request: NextRequest, path: BusinessPath, metho
   } catch (error) {
     const response = reply({ message: error instanceof InvalidRequest ? 'Invalid JSON request' : 'Service is temporarily unavailable' }, error instanceof InvalidRequest ? 400 : 503);
     return refreshed ? store(response, refreshed) : response;
+  }
+}
+
+export async function publicRequest(request: NextRequest, action: 'signup' | 'leads' | 'plans'): Promise<NextResponse> {
+  try {
+    const mutate = action !== 'plans';
+    const rejected = checkOrigin(request, mutate);
+    if (rejected) return rejected;
+    const path = action === 'signup' ? '/auth/web/signup' : '/commercial/' + action;
+    const response = await upstream(path, mutate ? 'POST' : 'GET', mutate ? await json(request) : undefined);
+    if (!response.ok) return failure(response);
+    if (action === 'signup') return reply({ status: 'signup_requested' });
+    return reply(await response.json(), response.status);
+  } catch (error) {
+    return reply({ message: error instanceof InvalidRequest ? 'Invalid JSON request' : 'Service is temporarily unavailable' }, error instanceof InvalidRequest ? 400 : 503);
   }
 }

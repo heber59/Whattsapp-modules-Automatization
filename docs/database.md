@@ -19,6 +19,7 @@ erDiagram
 | whatsapp_numbers | business_id, unique E.164 phone, optional unique Meta phone ID, status. Multiple numbers per business. |
 | products | business_id, name, nonnegative decimal price, COP currency, active flag. Multiple products per business. |
 | schema_migrations | Version, checksum, and application date. Never edit applied migrations. |
+| commercial_requests | Contact/plan requests, verified auth user ID for purchases, email/phone, consent timestamp, pending/contacted/closed status. No payment credentials. |
 
 ## Isolation
 - Business queries filter by the authenticated user's membership.
@@ -45,4 +46,14 @@ From the repository root, with local PostgreSQL running:
 corepack pnpm db:migrate
 ```
 
-Versioned SQL lives in apps/api/migrations. The runner uses a cross-process lock, one transaction per file, and checksums. Run it explicitly before using the modules; API and worker startup do not apply migrations. No migrations have been applied to remote Supabase.
+Versioned SQL lives in apps/api/migrations. The runner uses a cross-process lock, one transaction per file, and checksums. Run it explicitly before using the modules; API and worker startup do not apply migrations. Migrations 001–003 are applied to the configured database.
+
+## Consultation follow-up
+
+After migrations 002 and 003, the operator uses a trusted PostgreSQL session with app-schema access to review requests:
+```sql
+SELECT id, kind, email, phone, name, message, plan, created_at
+FROM app.commercial_requests
+WHERE status = 'pending_contact' ORDER BY created_at;
+```
+Record follow-up by updating that request's status to contacted or closed. There is no public lead-list endpoint or automatic notification. Restrict database access to the operator; do not expose this table through Supabase browser APIs.

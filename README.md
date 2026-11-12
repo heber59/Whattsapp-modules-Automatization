@@ -1,6 +1,6 @@
 # Whattsapp Automatization
 
-A Colombian micro-SaaS project for receiving and managing WhatsApp orders through configurable visual workflows.
+A micro-SaaS project for businesses to receive and manage WhatsApp orders through configurable visual workflows.
 
 ## Planned product
 

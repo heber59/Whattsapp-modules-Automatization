@@ -27,6 +27,16 @@ export class AuthService {
     return { status: 'authenticated' as const, session };
   }
 
+  async signup(input: unknown) {
+    const parsed = credentials.extend({ password: z.string().min(8).max(1024) }).safeParse(input);
+    if (!parsed.success) throw new BadRequestException('A valid email and a password of 8 to 1024 characters are required');
+    const { email, password, captchaToken } = parsed.data;
+    const retryAfter = await this.limiter.consume('account', 'signup:' + email);
+    if (retryAfter) return { status: 'limited' as const, retryAfter };
+    await this.gateway.signup(email, password, captchaToken);
+    return { status: 'signup_requested' as const };
+  }
+
   refresh(input: unknown) {
     const parsed = z.object({ refresh_token: z.string().min(1).max(8192) }).strict().safeParse(input);
     if (!parsed.success) throw new BadRequestException('A refresh token is required');

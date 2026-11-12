@@ -1,71 +1,39 @@
 # Frontend architecture
 
-Next.js App Router + TypeScript. The current playground uses SVG; React Flow remains planned.
+Next.js App Router and TypeScript. The current playground uses SVG; React Flow remains planned.
 
-## Current portal
+## Portal
 
-The shared portal header stays visible across routes with English/Spanish labels and light/dark themes. Preferences persist in browser storage. The landing page explains the project, available tools, intended audience, and planned WhatsApp/order capabilities.
+The shared header provides English/Spanish labels and light/dark themes. Preferences persist locally. The landing page serves businesses worldwide, with separate paths to plans and personal consultation.
 
-Header and landing calls to action open a native sign-in dialog; /login remains available as a standalone route. /api/session verifies the current profile through the existing server-only authentication proxy. No provider tokens are exposed to the browser.
+Visitors can leave an email or international phone number and explicit contact consent without an account. The footer credits Heber Santiago Alvarez Rincon and links to his contact form. No owner contact address is invented.
 
-/flows requires a verified session and provides a large scrollable SVG canvas, step settings, graph validation, and a customer preview. Drafts are stored per application user on the current device; server persistence and publication remain pending. The original shared draft key is left untouched. User-authored text is not changed when switching the interface language.
+Plan choices come from the backend. Buy plan opens the account and purchase-details flow. Signed-in customers can save their details for later payment. The single full-access plan costs COP 50,000/month and includes personal assistance. Checkout remains unavailable; the interface never treats a request as payment. WhatsApp connection remains on the roadmap. The sign-in dialog preserves the selected plan. Customers creating an account are guided to return to Plans.
 
-## Target organization
+/signup registers through a same-origin server proxy. Customers complete any provider email confirmation and sign in through the existing dialog or /login. /api/session verifies the profile. Provider tokens remain in HttpOnly cookies and are never exposed to browser code.
 
+/flows requires a verified session and provides a scrollable SVG canvas, step settings, graph validation, and customer preview. Drafts are stored per application user on the current device; server persistence and publication remain pending. The original shared draft key stays untouched. Switching language does not change user-authored text.
+
+## Organization
 
 ```text
-apps/web/
-├── public/                              # Static assets
-└── src/
-    ├── app/                             # Routing and page composition
-    │   ├── layout.tsx                   # Root layout
-    │   ├── providers.tsx                # React providers; no route
-    │   ├── globals.css                  # Global styles
-    │   ├── (auth)/                      # Route group, excluded from URLs
-    │   │   └── login/
-    │   │       └── page.tsx             # /login
-    │   └── (dashboard)/
-    │       ├── layout.tsx               # Dashboard layout
-    │       ├── flows/
-    │       │   ├── page.tsx             # /flows
-    │       │   └── [flowId]/
-    │       │       └── page.tsx         # /flows/:flowId
-    │       ├── orders/
-    │       │   └── page.tsx
-    │       ├── conversations/
-    │       │   └── page.tsx
-    │       ├── catalog/
-    │       │   └── page.tsx
-    │       └── settings/
-    │           └── page.tsx
-    ├── features/
-    │   ├── auth/
-    │   ├── flows/                       # Example feature layout
-    │   │   ├── components/              # Editor, panels, visual nodes
-    │   │   ├── hooks/                   # Editor behavior
-    │   │   ├── api/                     # Flow queries and mutations
-    │   │   ├── model/                   # State, types, local rules
-    │   │   └── utils/                   # Pure transformations
-    │   ├── orders/
-    │   ├── conversations/
-    │   ├── catalog/
-    │   └── settings/
-    └── shared/
-        ├── components/
-        │   ├── ui/                      # Buttons, fields, dialogs
-        │   └── layout/                  # Navigation, sidebar, header
-        ├── hooks/                       # Cross-feature reusable hooks
-        ├── lib/                         # HTTP client and common settings
-        ├── types/                       # Shared interface types
-        └── utils/                       # Shared pure functions
+apps/web/src/
+├── app/                       # Routes, layouts, and composition
+│   ├── api/                   # Same-origin server proxies
+│   ├── flows/                 # Current editor playground
+│   ├── signup/                # Account creation
+│   └── portal.tsx             # Shared session, preferences, sign-in
+├── features/
+│   └── commercial/            # Contact and plan-request UI
+├── server/                    # Server-only API/session helpers
+└── shared/                    # Reusable components and utilities
 ```
 
 ## Implementation rules
-- Keep pages small: compose screens and delegate behavior to features.
-- Keep components focused and API operations separate from presentation.
-- Keep specific behavior in its feature. Move it to shared when reuse exists.
-- Dependency direction: app → features → shared. Shared does not import features; avoid cycles.
-- App Router uses app/.../page.tsx. Do not also create src/pages.
-- Default to server components. Use client components for interactions such as React Flow; keep secrets on the server.
-- Separate interface state from remote state; avoid one global store for everything.
-- Place focused unit tests next to the code they verify and end-to-end flows in apps/web/e2e/. Prioritize graph rules, transformations, and critical journeys.
+
+- Keep pages small; delegate behavior to focused features.
+- Dependency direction is app → features → shared; avoid cycles.
+- Default to server components. Use client components for interaction and keep secrets server-only.
+- Separate interface state from remote state.
+- Validate external input, sessions, and business access on the server.
+- Keep focused unit tests next to relevant code and critical journeys in apps/web/e2e/.

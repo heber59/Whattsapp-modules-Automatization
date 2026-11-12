@@ -23,6 +23,15 @@ async function fixture(overrides: Record<string, unknown> = {}) {
   const provider = createServer(async (request, response) => {
     providerCalls++;
     response.setHeader('Content-Type', 'application/json');
+    if (request.url?.startsWith('/auth/v1/signup')) {
+      let raw = '';
+      for await (const chunk of request) raw += String(chunk);
+      const input = JSON.parse(raw) as { email: string; password: string };
+      assert.equal(input.password.length >= 8, true);
+      response.end(JSON.stringify({ id: randomUUID(), email: input.email, aud: 'authenticated',
+        created_at: '2026-01-01T00:00:00Z', app_metadata: {}, user_metadata: {} }));
+      return;
+    }
     if (request.url?.startsWith('/auth/v1/token')) {
       let raw = '';
       for await (const chunk of request) raw += String(chunk);
@@ -159,6 +168,32 @@ async function fixture(overrides: Record<string, unknown> = {}) {
 
 test('failed initialization fixture probe', { skip: !process.env.WA_FIXTURE_FAILURE_PROBE }, async () => {
   await assert.rejects(fixture({ DATABASE_URL: 'postgresql://test:test@127.0.0.1:1/test' }), { code: 'ECONNREFUSED' });
+});
+
+test('Signup and commercial requests preserve credentials and authenticated purchase boundaries', async () => {
+  const f = await fixture();
+  const email = randomUUID() + '@example.invalid';
+  try {
+    const signup = await f.request('/auth/web/signup', undefined, { email, password: 'password123' },
+      { 'x-web-auth-key': 'test-web-auth-secret-at-least-32-characters' });
+    assert.equal(signup.status, 200);
+    assert.deepEqual(await signup.json(), { status: 'signup_requested' });
+    assert.equal((await f.request('/auth/web/signup', undefined, { email, password: 'password123' })).status, 401);
+    assert.equal((await f.request('/commercial/leads', undefined, { email, consent: true })).status, 201);
+    assert.equal((await f.request('/commercial/purchase-requests', undefined, { email, consent: true, plan: 'full-access' })).status, 401);
+    const purchase = await f.request('/commercial/purchase-requests', 'alice', { email, consent: true, plan: 'full-access' });
+    assert.equal(purchase.status, 201);
+    assert.deepEqual(await purchase.json(), { status: 'pending_contact' });
+    const rows = await f.database.query('SELECT kind, status, auth_user_id, plan FROM app.commercial_requests WHERE email = $1 ORDER BY kind', [email]);
+    assert.equal(rows.rowCount, 2);
+    assert.equal(rows.rows[0]?.auth_user_id, null);
+    assert.equal(rows.rows[1]?.auth_user_id, f.identities.alice);
+    assert.equal(rows.rows[1]?.status, 'pending_contact');
+    assert.equal(rows.rows[1]?.plan, 'full-access');
+  } finally {
+    await f.database.query('DELETE FROM app.commercial_requests WHERE email = $1', [email]);
+    await f.close();
+  }
 });
 
 test('failed fixture initialization releases sockets and exits without forced shutdown', { timeout: 20000 }, () => {

@@ -9,7 +9,7 @@
     "start": "node dist/main.js",
     "start:worker": "node dist/worker.js",
     "typecheck": "tsc --noEmit",
-    "test": "node --require ts-node/register --test src/shared/config/config.spec.ts",
+    "test": "node --require ts-node/register --test src/shared/config/config.spec.ts src/modules/auth/auth.spec.ts src/modules/commercial/commercial.spec.ts",
     "test:e2e": "node --require ts-node/register --test test/*.e2e-spec.ts",
     "lint": "eslint src test --max-warnings=0",
     "test:e2e:api": "node --require ts-node/register --test test/health.e2e-spec.ts test/security.e2e-spec.ts test/http-config.e2e-spec.ts",

@@ -65,6 +65,22 @@ export class SupabaseAuthGateway {
     };
   }
 
+  async signup(email: string, password: string, captchaToken?: string): Promise<void> {
+    const { data, error } = await this.client().auth.signUp({
+      email, password,
+      options: {
+        emailRedirectTo: new URL('/login', this.config.getOrThrow<string>('WEB_ORIGIN')).href,
+        ...(captchaToken ? { captchaToken } : {}),
+      },
+    });
+    if (error) {
+      this.unavailable(error.status);
+      if (error.code !== 'user_already_exists') throw new BadRequestException('Account creation could not be completed');
+    }
+    // Confirmation settings may issue a session immediately. Do not retain it.
+    if (data.session) await this.logout(data.session.access_token);
+  }
+
   async refresh(refreshToken: string) {
     const { url, key } = this.settings();
     // The SDK retries refresh failures for its background-refresh window. Keep
