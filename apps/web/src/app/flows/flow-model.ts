@@ -1,13 +1,7 @@
-export type Kind = 'Start' | 'Message' | 'Menu' | 'End';
-type Choice = { label: string; to: string };
-export type Step = {
-  id: string;
-  kind: Kind;
-  text: string;
-  x: number;
-  y: number;
-  choices: Choice[];
-};
+import type { FlowStep, FlowStepKind } from '@wa/contracts';
+export type Kind = FlowStepKind;
+export type Step = FlowStep;
+type Choice = FlowStep['choices'][number];
 export const kinds: Kind[] = ['Start', 'Message', 'Menu', 'End'];
 export const key = 'wa.playground.v1';
 export const example: Step[] = [
@@ -75,21 +69,38 @@ export function validateFlow(steps: Step[]): string {
   if (starts.length !== 1) return 'Add exactly one Start step.';
 
   const byId = new Map(steps.map((step) => [step.id, step]));
+  if (byId.size !== steps.length) return 'Step identifiers must be unique.';
   const incoming = new Map<string, string[]>();
   for (const step of steps) {
     if (!step.text.trim()) return 'Give each step some text.';
+    if (step.kind === 'End' && step.choices.length) return 'End steps cannot have outgoing replies.';
+    if ((step.kind === 'Start' || step.kind === 'Message') && step.choices.length !== 1) return 'Start and Message steps need exactly one outgoing reply.';
+    const labels = new Set<string>();
     if (step.kind === 'Menu' && !step.choices.length)
       return 'Add a reply to each menu.';
     for (const choice of step.choices) {
       if (!choice.label.trim() || !byId.has(choice.to)) {
         return 'Connect each outgoing reply and give it a label.';
       }
+      if (byId.get(choice.to)?.kind === 'Start') return 'Replies cannot target Start.';
+      const label = choice.label.trim().toLowerCase();
+      if (labels.has(label)) return 'Reply labels must be unique within each step.';
+      labels.add(label);
       const parents = incoming.get(choice.to) ?? [];
       parents.push(step.id);
       incoming.set(choice.to, parents);
     }
   }
 
+  for (const step of steps) {
+    const seen = new Set<string>();
+    let current: Step | undefined = step;
+    while (current && current.kind !== 'Menu' && current.kind !== 'End') {
+      if (seen.has(current.id)) return 'This path loops before the customer can reply. Change a connection and try again.';
+      seen.add(current.id);
+      current = byId.get(current.choices[0]?.to ?? '');
+    }
+  }
   // Follow replies forward to find steps that a customer can actually visit.
   const reachable = visit([starts[0]!.id], (id) =>
     byId.get(id)!.choices.map((choice) => choice.to),

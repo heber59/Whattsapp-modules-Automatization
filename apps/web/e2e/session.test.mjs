@@ -15,6 +15,7 @@ async function listen(server) {
 test('merchant cookies survive reload, renew, isolate businesses and clear on logout', { timeout: 30000 }, async (t) => {
   const key = randomUUID();
   const businesses = new Map();
+  const flows = new Map();
   const profiles = new Map();
   const current = new Map();
   const sessions = new Map();
@@ -86,6 +87,34 @@ test('merchant cookies survive reload, renew, isolate businesses and clear on lo
       return send(201, business);
     }
     if (req.url === '/businesses') return send(200, owned);
+    const channelRoute = /^\/businesses\/([^/]+)\/whatsapp$/.exec(req.url);
+    if (channelRoute) {
+      if (!owned.some(business => business.id === channelRoute[1])) return send(404, {});
+      return send(req.method === 'POST' ? 201 : 200, {
+        channel: req.method === 'POST' ? { phoneNumberId: '123456', flowId: body.flowId, version: body.version, status: 'configured' } : null,
+        configuration: { ready: true, missing: [] }, webhookPath: '/webhooks/whatsapp',
+      });
+    }
+    const flowRoute = /^\/businesses\/([^/]+)\/flows(?:\/([^/]+))?(?:\/(publish|versions)\/?([0-9]+)?)?$/.exec(req.url);
+    if (flowRoute) {
+      const [, businessId, flowId, action, versionNumber] = flowRoute;
+      if (!owned.some(business => business.id === businessId)) return send(404, {});
+      const records = flows.get(businessId) ?? [];
+      if (!flowId) {
+        if (req.method === 'GET') return send(200, { flows: records });
+        const flow = { id: randomUUID(), businessId, name: body.name, steps: [], revision: 1 };
+        flows.set(businessId, [...records, flow]);
+        return send(201, { flow });
+      }
+      const flow = records.find(record => record.id === flowId);
+      if (!flow) return send(404, {});
+      if (action === 'versions') return send(200, { version: { number: Number(versionNumber), steps: [] } });
+      if (req.method === 'GET') return send(200, { flow });
+      if (body.expectedRevision !== flow.revision) return send(409, {});
+      if (action === 'publish') return send(201, { version: { number: 1, steps: flow.steps } });
+      Object.assign(flow, { name: body.name, steps: body.steps, revision: flow.revision + 1 });
+      return send(200, { flow });
+    }
     const business = owned.find((row) => req.url === '/businesses/' + row.id);
     return send(business ? 200 : 404, business ?? {});
   });
@@ -115,9 +144,9 @@ test('merchant cookies survive reload, renew, isolate businesses and clear on lo
 
   function browser() {
     const jar = new Map();
-    return async (path, body, source = origin) => {
+    return async (path, body, source = origin, method = body === undefined ? 'GET' : 'POST') => {
       const response = await fetch(origin + '/api/' + path, {
-        method: body === undefined ? 'GET' : 'POST',
+        method,
         headers: { Origin: source, 'Content-Type': 'application/json', Cookie: [...jar].map(([k, v]) => k + '=' + v).join('; ') },
         body: body === undefined ? undefined : JSON.stringify(body),
       });
@@ -168,6 +197,38 @@ test('merchant cookies survive reload, renew, isolate businesses and clear on lo
   const created = await alice('businesses', { name: 'Pilot shop' });
   assert(created.ok);
   const { id } = await created.json();
+  const flowPath = 'businesses/' + id + '/flows';
+  const channelPath = 'businesses/' + id + '/whatsapp';
+  assert.equal((await visitor(channelPath)).status, 401);
+  assert.equal((await bob(channelPath)).status, 404);
+  assert.equal((await alice(channelPath, {}, 'https://unrelated.invalid')).status, 403);
+  const channelStatus = await alice(channelPath);
+  assert.equal(channelStatus.status, 200);
+  assert.equal(channelStatus.headers.get('cache-control'), 'no-store');
+  assert.deepEqual((await channelStatus.json()).configuration, { ready: true, missing: [] });
+  assert.equal((await visitor(flowPath)).status, 401);
+  assert.equal((await bob(flowPath)).status, 404);
+  assert.equal((await alice(flowPath, { name: 'Menu' }, 'https://unrelated.invalid')).status, 403);
+  const createFlow = await alice(flowPath, { name: 'Menu' });
+  assert.equal(createFlow.status, 201);
+  const { flow } = await createFlow.json();
+  const channelSaved = await alice(channelPath, { flowId: flow.id, version: 1 });
+  assert.equal(channelSaved.status, 201);
+  assert.doesNotMatch(await channelSaved.text(), /access_token|app_secret|verify_token/);
+  const itemPath = flowPath + '/' + flow.id;
+  assert.equal((await alice(itemPath, {}, 'https://unrelated.invalid', 'PATCH')).status, 403);
+  assert.equal((await alice(itemPath, { name: 'x'.repeat(70000) }, origin, 'PATCH')).status, 400);
+  const saved = await alice(itemPath, { name: 'Saved menu', steps: [], expectedRevision: 1 }, origin, 'PATCH');
+  assert.equal(saved.status, 200);
+  assert.equal((await saved.json()).flow.revision, 2);
+  assert.equal((await alice(itemPath, { name: 'Stale', steps: [], expectedRevision: 1 }, origin, 'PATCH')).status, 409);
+  const persisted = await alice(itemPath);
+  assert.equal(persisted.headers.get('cache-control'), 'no-store');
+  assert.equal((await persisted.json()).flow.name, 'Saved menu');
+  assert.equal((await alice(itemPath + '/publish', { expectedRevision: 2 })).status, 201);
+  assert.equal((await alice(itemPath + '/versions/1')).status, 200);
+  assert.equal((await bob(itemPath)).status, 404);
+  assert.equal((await alice(flowPath + '/invalid-id')).status, 400);
   current.clear();
   assert.equal((await (await alice('businesses/' + id)).json()).name, 'Pilot shop');
   assert.equal(renewals, 1);

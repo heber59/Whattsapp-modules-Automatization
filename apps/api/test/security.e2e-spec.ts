@@ -137,9 +137,9 @@ async function fixture(overrides: Record<string, unknown> = {}) {
     const redis = new Redis(base.REDIS_URL, { maxRetriesPerRequest: 1, commandTimeout: 3000 });
     cleanup.add(() => redis.disconnect());
     redis.on('error', () => {});
-    const request = (url: string, token?: string, body?: unknown, headers: Record<string, string> = {}) =>
+    const request = (url: string, token?: string, body?: unknown, headers: Record<string, string> = {}, method?: string) =>
       fetch(app.getHttpServer().address() ? 'http://127.0.0.1:' + (app.getHttpServer().address() as AddressInfo).port + url : '', {
-        method: body === undefined ? 'GET' : 'POST',
+        method: method ?? (body === undefined ? 'GET' : 'POST'),
         headers: { ...(token ? { Authorization: 'Bearer ' + token } : {}), 'Content-Type': 'application/json', ...headers },
         body: body === undefined ? undefined : JSON.stringify(body),
       });
@@ -168,6 +168,53 @@ async function fixture(overrides: Record<string, unknown> = {}) {
 
 test('failed initialization fixture probe', { skip: !process.env.WA_FIXTURE_FAILURE_PROBE }, async () => {
   await assert.rejects(fixture({ DATABASE_URL: 'postgresql://test:test@127.0.0.1:1/test' }), { code: 'ECONNREFUSED' });
+});
+
+test('Flow drafts isolate businesses, enforce roles and revisions, and publish immutable versions atomically', async () => {
+  const f = await fixture({ RATE_LIMIT_USER_LIMIT: 200 });
+  try {
+    const business = await (await f.request('/businesses', 'alice', { name: 'Flow fixture' })).json() as { id: string };
+    const path = '/businesses/' + business.id + '/flows';
+    assert.equal((await f.request(path)).status, 401);
+    assert.equal((await f.request(path, 'bob')).status, 404);
+    const created = await (await f.request(path, 'alice', { name: 'Incomplete', steps: [] })).json() as { flow: { id: string; revision: number } };
+    const flowPath = path + '/' + created.flow.id;
+    assert.equal(created.flow.revision, 1);
+    assert.equal((await f.request(flowPath + '/publish', 'alice', { expectedRevision: 1 })).status, 400);
+    await f.request('/identity/me', 'bob');
+    await f.database.query(`INSERT INTO app.memberships(business_id,user_id,role)
+      SELECT $1,id,'operator' FROM app.users WHERE auth_user_id=$2`, [business.id, f.identities.bob]);
+    assert.equal((await f.request(flowPath, 'bob')).status, 200);
+    assert.equal((await f.request(path, 'bob', { name: 'Denied', steps: [] })).status, 403);
+    assert.equal((await f.request(flowPath, 'bob', { name: 'Denied', steps: [], expectedRevision: 1 }, {}, 'PATCH')).status, 403);
+    assert.equal((await f.request(flowPath + '/publish', 'bob', { expectedRevision: 1 })).status, 403);
+    const steps = [
+      { id: 's', kind: 'Start', text: 'Hi', x: 0, y: 0, choices: [{ label: 'Next', to: 'e' }] },
+      { id: 'e', kind: 'End', text: 'Bye', x: 100, y: 0, choices: [] },
+    ];
+    const saves = await Promise.all([1, 2].map(() => f.request(flowPath, 'alice', { name: 'Saved', steps, expectedRevision: 1 }, {}, 'PATCH')));
+    assert.deepEqual(saves.map((response) => response.status).sort(), [200, 409]);
+    const published = await Promise.all([1, 2].map(async () => {
+      const response = await f.request(flowPath + '/publish', 'alice', { expectedRevision: 2 });
+      assert.equal(response.status, 201);
+      return response.json() as Promise<{ version: { version: number; sourceRevision: number; steps: unknown[] } }>;
+    }));
+    assert.deepEqual(published[0], published[1]);
+    assert.equal(published[0]!.version.version, 1);
+    assert.equal(published[0]!.version.sourceRevision, 2);
+    assert.equal((await f.request(flowPath, 'alice', { name: 'Changed draft', steps: [], expectedRevision: 2 }, {}, 'PATCH')).status, 200);
+    const version = await f.request(flowPath + '/versions/1', 'bob');
+    assert.deepEqual(await version.json(), published[0]);
+    assert.deepEqual(await (await f.request(flowPath + '/publish', 'alice', { expectedRevision: 2 })).json(), published[0]);
+    assert.equal((await f.request(flowPath + '/publish', 'alice', { expectedRevision: 1 })).status, 409);
+    await assert.rejects(f.database.query("UPDATE app.flow_versions SET name='tamper' WHERE business_id=$1", [business.id]), /immutable/);
+    const other = await (await f.request('/businesses', 'bob', { name: 'Other business' })).json() as { id: string };
+    assert.equal((await f.request('/businesses/' + other.id + '/flows/' + created.flow.id, 'bob')).status, 404);
+    await f.database.query("UPDATE app.memberships SET role='admin' WHERE business_id=$1 AND user_id=(SELECT id FROM app.users WHERE auth_user_id=$2)", [business.id, f.identities.bob]);
+    assert.equal((await f.request(flowPath, 'bob', { name: 'Admin edit', steps, expectedRevision: 3 }, {}, 'PATCH')).status, 200);
+    const v2 = await (await f.request(flowPath + '/publish', 'bob', { expectedRevision: 4 })).json() as { version: { version: number } };
+    assert.equal(v2.version.version, 2);
+  } finally { await f.close(); }
 });
 
 test('Signup and commercial requests preserve credentials and authenticated purchase boundaries', async () => {

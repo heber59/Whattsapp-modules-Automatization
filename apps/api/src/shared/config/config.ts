@@ -34,12 +34,24 @@ const environmentSchema = z.object({
   SUPABASE_URL: optionalText,
   SUPABASE_PUBLISHABLE_KEY: optionalText,
   WEB_AUTH_SECRET: z.preprocess((value) => value === '' ? undefined : value, z.string().min(32).max(512).optional()),
+  META_ACCESS_TOKEN: optionalText,
+  META_APP_SECRET: optionalText,
+  META_VERIFY_TOKEN: optionalText,
+  META_PHONE_NUMBER_ID: z.preprocess((value) => value === '' ? undefined : value, z.string().regex(/^[0-9]{5,30}$/).optional()),
+  META_BUSINESS_ID: z.preprocess((value) => value === '' ? undefined : value, z.uuid().optional()),
+  META_GRAPH_VERSION: z.preprocess((value) => value === '' ? undefined : value, z.string().regex(/^v[0-9]{1,3}\.[0-9]+$/).optional()),
+  META_GRAPH_ORIGIN: z.string().default('https://graph.facebook.com'),
   RATE_LIMIT_IP_LIMIT: z.coerce.number().int().min(1).max(100000).default(120),
   RATE_LIMIT_LOGIN_ACCOUNT_LIMIT: z.coerce.number().int().min(1).max(1000).default(5),
   RATE_LIMIT_USER_LIMIT: z.coerce.number().int().min(1).max(100000).default(60),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).max(3600000).default(60000),
   RATE_LIMIT_PREFIX: z.string().regex(/^[a-zA-Z0-9:-]{1,64}$/).default('wa:rate'),
 }).superRefine((config, context) => {
+  try {
+    const origin = new URL(config.META_GRAPH_ORIGIN);
+    const test = config.NODE_ENV === 'test' && ['localhost', '127.0.0.1', '[::1]'].includes(origin.hostname) && origin.protocol === 'http:';
+    if ((!test && origin.origin !== 'https://graph.facebook.com') || origin.origin !== config.META_GRAPH_ORIGIN) throw new Error();
+  } catch { context.addIssue({ code: 'custom', path: ['META_GRAPH_ORIGIN'], message: 'Only official Meta origin or local test simulator is allowed' }); }
   if (Boolean(config.SUPABASE_URL) !== Boolean(config.SUPABASE_PUBLISHABLE_KEY)) {
     context.addIssue({ code: 'custom', path: ['SUPABASE_URL'], message: 'Configure both Supabase variables' });
   }

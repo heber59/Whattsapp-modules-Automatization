@@ -20,6 +20,7 @@ erDiagram
 | products | business_id, name, nonnegative decimal price, COP currency, active flag. Multiple products per business. |
 | schema_migrations | Version, checksum, and application date. Never edit applied migrations. |
 | commercial_requests | Contact/plan requests, verified auth user ID for purchases, email/phone, consent timestamp, pending/contacted/closed status. No payment credentials. |
+| flows / flow_versions | Business-scoped drafts with optimistic revisions; immutable numbered publication snapshots. See [flows](flows.md). |
 
 ## Isolation
 - Business queries filter by the authenticated user's membership.
@@ -46,7 +47,7 @@ From the repository root, with local PostgreSQL running:
 corepack pnpm db:migrate
 ```
 
-Versioned SQL lives in apps/api/migrations. The runner uses a cross-process lock, one transaction per file, and checksums. Run it explicitly before using the modules; API and worker startup do not apply migrations. Migrations 001–003 are applied to the configured database.
+Versioned SQL lives in apps/api/migrations with locks, transactions, and checksums. Run migrations explicitly; startup does not apply them. Applied migrations 004–005 add flow publications and private WhatsApp channels, inbox, outbox, conversations, and delivery events. See [WhatsApp](whatsapp.md).
 
 ## Consultation follow-up
 

@@ -8,5 +8,6 @@ import { BusinessesService } from './businesses.service';
 @Module({
   imports: [DatabaseModule, IdentityModule], controllers: [BusinessesController],
   providers: [BusinessesRepository, BusinessesService],
+  exports: [BusinessesService],
 })
 export class BusinessesModule {}
