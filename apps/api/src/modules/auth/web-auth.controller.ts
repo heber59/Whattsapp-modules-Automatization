@@ -44,6 +44,21 @@ export class WebAuthController {
     return this.auth.refresh(input);
   }
 
+  @Post('signup')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  @Header('Pragma', 'no-cache')
+  async signup(@Headers('x-web-auth-key') key: string | undefined, @Body() input: unknown,
+    @Res({ passthrough: true }) response: ResponseHeaders) {
+    this.authorize(key);
+    const result = await this.auth.signup(input);
+    if (result.status === 'limited') {
+      response.setHeader('Retry-After', String(result.retryAfter));
+      throw new HttpException('Too many requests; try again later', HttpStatus.TOO_MANY_REQUESTS);
+    }
+    return result;
+  }
+
   @Post('logout')
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')

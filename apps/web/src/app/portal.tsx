@@ -69,6 +69,8 @@ export function Portal({ children }: { children: ReactNode }) {
       <nav className="main-nav" aria-label={t('Main navigation', 'Navegación principal')}>
         <Link href="/#solutions">{t('Solutions', 'Soluciones')}</Link>
         <Link href="/#purpose">{t('Our purpose', 'Nuestro propósito')}</Link>
+        <Link href="/#plans">{t('Plans', 'Planes')}</Link>
+        <Link href="/#contact">{t('Contact', 'Contacto')}</Link>
         <Link href="/flows" aria-current={pathname === '/flows' ? 'page' : undefined}>{t('Flow studio', 'Estudio de flujos')}</Link>
       </nav>
       <div className="header-actions">
@@ -80,7 +82,7 @@ export function Portal({ children }: { children: ReactNode }) {
       </div>
     </header>
     {children}
-    <footer className="portal-footer"><Link className="brand" href="/">Whattsapp Automatization<span className="green-dot" /></Link><span>{t('Built for the businesses behind every conversation.', 'Para los negocios detrás de cada conversación.')}</span><span>Colombia · {t('In development', 'En desarrollo')}</span></footer>
+    <footer className="portal-footer"><div><Link className="brand" href="/">Whattsapp Automatization<span className="green-dot" /></Link><p>{t('Built for the businesses behind every conversation.', 'Para los negocios detrás de cada conversación.')}</p></div><div className="footer-contact"><Link href="/#contact">{t('Contact Heber Santiago', 'Contactar a Heber Santiago')} ↗</Link><span>{t('For businesses', 'Para negocios')}</span></div><section aria-label={t('Copyright', 'Derechos de autor')} className="copyright"><strong>{t('Copyright', 'Derechos de autor')}</strong><span>© {new Date().getFullYear()} Heber Santiago Alvarez Rincon.</span><span>{t('All rights reserved.', 'Todos los derechos reservados.')}</span></section></footer>
     <dialog ref={dialog} aria-label={t("Sign in", "Ingresar")} className="login-dialog" onClick={event => { if (event.target === event.currentTarget) dialog.current?.close(); }}>
       <button className="dialog-close" aria-label={t('Close sign in', 'Cerrar ingreso')} onClick={() => dialog.current?.close()}>×</button>
       <LoginForm onSuccess={() => { dialog.current?.close(); router.push(destination); }} />
@@ -119,6 +121,7 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
       <button type="submit" disabled={pending}>{pending ? t('Signing in…', 'Ingresando…') : t('Enter my workspace', 'Entrar a mi espacio')} <span aria-hidden="true">→</span></button>
     </form>
     <Link href="/forgot-password" onClick={event => event.currentTarget.closest('dialog')?.close()}>{t('Forgot your password?', '¿Olvidaste tu contraseña?')}</Link>
+    <p className="account-links">{t('New here?', '¿Primera vez aquí?')} <Link href="/signup" onClick={event => event.currentTarget.closest('dialog')?.close()}>{t('Create an account', 'Crear una cuenta')}</Link></p>
   </div>;
 }
 

@@ -37,8 +37,11 @@ test('merchant cookies survive reload, renew, isolate businesses and clear on lo
     let raw = '';
     for await (const chunk of req) raw += chunk;
     const body = raw ? JSON.parse(raw) : {};
+    if (req.url === '/commercial/plans') return send(200, { plans: [{ id: 'full-access', name: 'Full access', price: 50000, currency: 'COP', interval: 'month' }], checkoutAvailable: false });
+    if (req.url === '/commercial/leads') return send(201, { status: 'received' });
     if (req.url.startsWith('/auth/web/')) {
       if (req.headers['x-web-auth-key'] !== key) return send(403, {});
+      if (req.url === '/auth/web/signup') return send(200, { status: 'signup_requested', access_token: 'must-not-leak', refresh_token: 'must-not-leak' });
       if (req.url === '/auth/web/recover/request') {
         recoveryRequests++;
         if (body.email === 'limited@example.invalid') {
@@ -71,6 +74,7 @@ test('merchant cookies survive reload, renew, isolate businesses and clear on lo
     }
     const email = current.get(req.headers.authorization?.slice(7));
     if (!email) return send(401, {});
+    if (req.url === '/commercial/purchase-requests') return send(201, { status: 'pending_contact' });
     if (req.url === '/identity/me') {
       if (!profiles.has(email)) profiles.set(email, randomUUID());
       return send(200, { id: profiles.get(email) });
@@ -131,6 +135,21 @@ test('merchant cookies survive reload, renew, isolate businesses and clear on lo
     };
   }
   const alice = browser(), bob = browser();
+  const visitor = browser();
+  assert.equal((await visitor('session/signup', {}, 'https://unrelated.invalid')).status, 403);
+  const signup = await visitor('session/signup', { email: 'new@example.invalid', password: 'fixture password' });
+  assert.equal(signup.status, 200);
+  assert.deepEqual(await signup.json(), { status: 'signup_requested' });
+  assert.equal(signup.headers.getSetCookie().length, 0);
+  assert.equal((await visitor('commercial/leads', {}, 'https://unrelated.invalid')).status, 403);
+  const lead = await visitor('commercial/leads', { email: 'visitor@example.invalid', consent: true });
+  assert.equal(lead.status, 201);
+  assert.equal(lead.headers.get('cache-control'), 'no-store');
+  assert.deepEqual(await lead.json(), { status: 'received' });
+  const catalog = await visitor('commercial/plans');
+  assert.equal(catalog.status, 200);
+  assert.equal((await catalog.json()).plans[0].price, 50000);
+  assert.equal((await visitor('commercial/purchase-requests', { plan: 'full-access', email: 'visitor@example.invalid', consent: true })).status, 401);
   assert.equal((await alice('session')).status, 401);
   for (const [client, email] of [[alice, 'alice@example.invalid'], [bob, 'bob@example.invalid']]) {
     const login = await client('session/login', { email, password: 'fixture password' });
@@ -143,6 +162,9 @@ test('merchant cookies survive reload, renew, isolate businesses and clear on lo
     assert.deepEqual(await (await client('businesses')).json(), []);
   }
   assert.equal((await alice('businesses', { name: 'Unexpected' }, 'https://unrelated.invalid')).status, 403);
+  const purchase = await alice('commercial/purchase-requests', { plan: 'full-access', email: 'alice@example.invalid', consent: true });
+  assert.equal(purchase.status, 201);
+  assert.deepEqual(await purchase.json(), { status: 'pending_contact' });
   const created = await alice('businesses', { name: 'Pilot shop' });
   assert(created.ok);
   const { id } = await created.json();

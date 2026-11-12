@@ -1,17 +1,17 @@
 'use client';
 import Link from 'next/link';
 import { usePortal } from './portal';
+import { ContactSection, PlansSection } from '../features/commercial/components';
 export default function HomePage() {
-  const { t, user, openLogin } = usePortal();
-  const launch = <>{user ? <Link className="button-link" href="/flows">{t('Open flow studio', 'Abrir estudio de flujos')} ↗</Link> : <button onClick={() => openLogin('/flows')}>{t('Create your first flow', 'Crea tu primer flujo')} ↗</button>}</>;
+  const { t } = usePortal();
   return <main className="portal-home">
     <div className="hero">
       <div className="hero-copy">
         <span className="section-kicker"><span className="green-dot" /> {t('LESS REPETITION. MORE CONNECTION.', 'MENOS REPETICIÓN. MÁS CONEXIÓN.')}</span>
         <h1>{t('A conversation.', 'Una conversación.')}<br /><em>{t('A possibility.', 'Una posibilidad.')}</em></h1>
         <p>{t('Turn everyday WhatsApp conversations into a clearer path for your customers. Design the flow. Keep the human touch.', 'Transforma las conversaciones de WhatsApp en un camino más claro para tus clientes. Diseña el flujo. Conserva el toque humano.')}</p>
-        <div className="hero-actions">{launch}<a className="text-link" href="#solutions">{t('Explore the possibilities', 'Explora las posibilidades')} ↓</a></div>
-        <div className="hero-note"><span className="tiny-line" /> {t('Made for Colombian businesses. Built around people.', 'Para negocios colombianos. Pensado para las personas.')}</div>
+        <div className="hero-actions"><a className="button-link" href="#plans">{t('Explore plans', 'Explorar planes')} ↗</a><a className="text-link" href="#contact">{t('Talk about your business', 'Conversemos sobre tu negocio')} ↓</a></div>
+        <div className="hero-note"><span className="tiny-line" /> {t('For businesses. Built around people.', 'Para negocios. Pensado para las personas.')}</div>
       </div>
       <div className="hero-visual" aria-label={t('Example conversation flow', 'Ejemplo de flujo de conversación')}>
         <div className="visual-top"><span className="green-dot" /> {t('A LITTLE STRUCTURE. A LOT OF POTENTIAL.', 'UN POCO DE ORDEN. MUCHO POTENCIAL.')}</div>
@@ -35,6 +35,8 @@ export default function HomePage() {
       ].map((card, index) => <article className="solution-card" key={index}><div className="card-top"><span className="solution-icon">{card.icon}</span><span>0{index + 1}</span></div><h3>{card.title}</h3><p>{card.body}</p><span className={card.available ? 'availability' : 'availability planned'}><span className="green-dot" />{card.tag}</span></article>)}</div>
     </section>
     <section id="purpose" className="purpose-section"><div><span className="section-kicker">02 / {t('WHO WE ARE HERE FOR', 'PARA QUIÉNES ESTAMOS AQUÍ')}</span><h2>{t('Small businesses.', 'Pequeños negocios.')}<br /><em>{t('Big human energy.', 'Gran energía humana.')}</em></h2></div><div><p>{t('For the neighborhood shop, the growing kitchen and the independent team doing a little bit of everything. Our goal is simple: give your time back, without losing what makes your business yours.', 'Para la tienda del barrio, la cocina que crece y el equipo independiente que hace un poco de todo. Nuestra meta es simple: devolverte tiempo sin perder lo que hace único a tu negocio.')}</p><div className="audience-tags"><span>{t('Local shops', 'Tiendas locales')}</span><span>{t('Food & pickup', 'Comida y recogida')}</span><span>{t('Independent teams', 'Equipos independientes')}</span></div></div></section>
-    <section className="portal-cta"><span className="section-kicker">{t('START WITH ONE CONVERSATION', 'EMPIEZA CON UNA CONVERSACIÓN')}</span><h2>{t('Make your next hello count.', 'Haz que tu próximo hola cuente.')}</h2>{launch}<p>{t('A working prototype. A clear ambition. More to come.', 'Un prototipo funcional. Una meta clara. Mucho por venir.')}</p></section>
+    <PlansSection />
+    <ContactSection />
+    <section className="portal-cta"><span className="section-kicker">{t('START WITH ONE CONVERSATION', 'EMPIEZA CON UNA CONVERSACIÓN')}</span><h2>{t('Make your next hello count.', 'Haz que tu próximo hola cuente.')}</h2><Link className="button-link" href="/signup">{t('Create an account', 'Crear una cuenta')} ↗</Link><p>{t('Already have an account?', '¿Ya tienes una cuenta?')} <Link href="/login">{t('Sign in', 'Ingresar')}</Link></p></section>
   </main>;
 }
