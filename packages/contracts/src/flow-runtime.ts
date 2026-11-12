@@ -4,6 +4,12 @@ import { flowStepKinds, type FlowDefinition, type FlowExpression, type FlowResul
 const safeKey = (key: string) => /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(key) && !['__proto__', 'constructor', 'prototype'].includes(key);
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 const waitingKind = (kind: string) => ['Menu', 'Input', 'Catalog', 'Handoff'].includes(kind);
+function validEmailInput(value: string): boolean {
+  const at = value.indexOf('@');
+  if (at < 1 || at !== value.lastIndexOf('@') || /\s/.test(value)) return false;
+  const dot = value.indexOf('.', at + 2);
+  return dot !== -1 && dot < value.length - 1;
+}
 export function evaluateExpression(expression: FlowExpression, variables: FlowVariables, depth = 0): FlowValue {
   if (depth > 12 || depth === 0 && !isFlowExpression(expression)) throw new Error('Invalid or excessively nested expression');
   const object: Record<string, unknown> | null = record(expression) ? expression : null;
@@ -146,7 +152,7 @@ export function runFlow(steps: FlowStep[], currentStep: string | null, reply: st
       let valid = !c.required || value.length > 0;
       if (value === '' && !c.required) value = null;
       else if (c.inputType === 'number') { value = value === '' ? NaN : Number(value); valid = valid && Number.isFinite(value) && (c.min === undefined || value >= c.min) && (c.max === undefined || value <= c.max); }
-      else { valid = valid && (c.min === undefined || value.length >= c.min) && (c.max === undefined || value.length <= c.max); if (c.inputType === 'email') valid = valid && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value); if (c.inputType === 'phone') valid = valid && /^\+[1-9][0-9]{7,14}$/.test(value); }
+      else { valid = valid && (c.min === undefined || value.length >= c.min) && (c.max === undefined || value.length <= c.max); if (c.inputType === 'email') valid = valid && validEmailInput(value); if (c.inputType === 'phone') valid = valid && /^\+[1-9][0-9]{7,14}$/.test(value); }
       if (!valid) { text(current, 'Please enter a valid value.'); prompt(current); return finish(current, 'waiting'); }
       variables[c.variable!] = value; current = nodes.get(current.choices[0]!.to);
     } else if (current.kind === 'Catalog') {

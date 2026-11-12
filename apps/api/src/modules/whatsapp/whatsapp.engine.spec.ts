@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { spawnSync } from 'node:child_process';
 import type { FlowStep } from '@wa/contracts';
 import { responseChunks, runMenu, runFlow } from './whatsapp.engine';
 import { evaluateExpression } from '@wa/contracts';
@@ -92,6 +93,39 @@ test('Optional blank inputs store null while required blanks keep waiting', () =
     assert.equal(required.currentStep, 'input');
     assert.equal(Object.hasOwn(required.variables, 'detail'), false);
   }
+});
+
+test('Email inputs preserve accepted formats and reject malformed answers', () => {
+  const steps: FlowStep[] = [
+    { id: 'email', kind: 'Input', text: 'Email?', config: { variable: 'email', inputType: 'email', required: true }, x: 0, y: 0, choices: [{ label: 'Next', to: 'end' }] },
+    { id: 'end', kind: 'End', text: 'Done', x: 0, y: 0, choices: [] },
+  ];
+  for (const answer of ['ana@example.com', 'ana+orders@sub.example.com', '  ana@example.com  ']) {
+    const result = runFlow(steps, 'email', answer);
+    assert.equal(result.state, 'completed');
+    assert.equal(result.variables.email, answer.trim());
+  }
+  for (const answer of ['', '@example.com', 'ana@', 'ana@example', 'ana@.com', 'ana@example.', 'ana@@example.com', 'ana@example.com@', 'ana@exam ple.com', 'ana\t@example.com']) {
+    const result = runFlow(steps, 'email', answer);
+    assert.equal(result.state, 'waiting');
+    assert.equal(Object.hasOwn(result.variables, 'email'), false);
+  }
+});
+
+test('Adversarial email input cannot block flow execution', () => {
+  const result = spawnSync(process.execPath, ['-e', `
+    const assert = require('node:assert/strict');
+    const { runFlow } = require('@wa/contracts');
+    const steps = [
+      { id: 'email', kind: 'Input', text: 'Email?', config: { variable: 'email', inputType: 'email', required: true }, x: 0, y: 0, choices: [{ label: 'Next', to: 'end' }] },
+      { id: 'end', kind: 'End', text: 'Done', x: 0, y: 0, choices: [] },
+    ];
+    const result = runFlow(steps, 'email', '!@!.' + '!.'.repeat(100000) + '@');
+    assert.equal(result.state, 'waiting');
+    assert.equal(Object.hasOwn(result.variables, 'email'), false);
+  `], { timeout: 5000, encoding: 'utf8' });
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr);
 });
 
 test('WhatsApp handoff emits approved-template metadata and bounds rendered parameters', () => {
