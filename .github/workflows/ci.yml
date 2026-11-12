@@ -188,6 +188,19 @@ jobs:
       DATABASE_URL: postgresql://wa:ci_local_password@127.0.0.1:5432/wa
       REDIS_URL: redis://127.0.0.1:6379
     services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: wa
+          POSTGRES_PASSWORD: ci_local_password
+          POSTGRES_DB: wa
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U wa -d wa"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 20
       redis:
         image: redis:7-alpine
         ports:

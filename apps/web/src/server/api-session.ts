@@ -6,6 +6,7 @@ const refreshCookie = 'wa-refresh';
 const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/' };
 type Session = { access_token: string; refresh_token: string; expires_in: number };
 type BusinessPath = '/identity/me' | '/businesses' | `/businesses/${string}` | '/commercial/purchase-requests';
+type AuthenticatedMethod = 'GET' | 'POST' | 'PATCH';
 class InvalidRequest extends Error {}
 
 function configuration() {
@@ -54,7 +55,7 @@ function checkOrigin(request: NextRequest, mutate: boolean): NextResponse | unde
   }
 }
 
-async function json(request: NextRequest): Promise<unknown> {
+async function json(request: NextRequest, limit = 16384): Promise<unknown> {
   const reader = request.body?.getReader();
   if (!reader) throw new InvalidRequest();
   const chunks: Uint8Array[] = [];
@@ -63,14 +64,14 @@ async function json(request: NextRequest): Promise<unknown> {
     const chunk = await reader.read();
     if (chunk.done) break;
     size += chunk.value.byteLength;
-    if (size > 16384) { await reader.cancel(); throw new InvalidRequest(); }
+    if (size > limit) { await reader.cancel(); throw new InvalidRequest(); }
     chunks.push(chunk.value);
   }
   try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); }
   catch { throw new InvalidRequest(); }
 }
 
-async function upstream(path: string, method: 'GET' | 'POST', body?: unknown, token?: string): Promise<Response> {
+async function upstream(path: string, method: AuthenticatedMethod, body?: unknown, token?: string): Promise<Response> {
   const config = configuration();
   return fetch(config.api + path, {
     method, cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(10000),
@@ -170,12 +171,37 @@ export async function logout(request: NextRequest): Promise<NextResponse> {
 }
 
 export async function businesses(request: NextRequest, path: BusinessPath, method: 'GET' | 'POST'): Promise<NextResponse> {
+  return authenticatedRequest(request, path, method);
+}
+
+export async function whatsapp(request: NextRequest, businessId: string, method: 'GET' | 'POST'): Promise<NextResponse> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(businessId)) {
+    return reply({ message: 'Invalid business identifier' }, 400);
+  }
+  return authenticatedRequest(request, `/businesses/${businessId}/whatsapp`, method, true);
+}
+
+export async function flows(request: NextRequest, path: string, method: AuthenticatedMethod): Promise<NextResponse> {
+  const uuid = '[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';
+  const collection = new RegExp(`^/businesses/${uuid}/flows$`, 'i');
+  const item = new RegExp(`^/businesses/${uuid}/flows/${uuid}$`, 'i');
+  const publish = new RegExp(`^/businesses/${uuid}/flows/${uuid}/publish$`, 'i');
+  const version = new RegExp(`^/businesses/${uuid}/flows/${uuid}/versions/[1-9][0-9]{0,8}$`, 'i');
+  if (!((collection.test(path) && (method === 'GET' || method === 'POST'))
+    || (item.test(path) && (method === 'GET' || method === 'PATCH'))
+    || (publish.test(path) && method === 'POST') || (version.test(path) && method === 'GET'))) {
+    return reply({ message: 'Invalid flow request' }, 400);
+  }
+  return authenticatedRequest(request, path, method, true);
+}
+
+async function authenticatedRequest(request: NextRequest, path: string, method: AuthenticatedMethod, flowPath = false): Promise<NextResponse> {
   let refreshed: Session | undefined;
   try {
-    const rejected = checkOrigin(request, method === 'POST');
+    const rejected = checkOrigin(request, method !== 'GET');
     if (rejected) return rejected;
-    if (path !== '/identity/me' && path !== '/businesses' && path !== '/commercial/purchase-requests' && !/^\/businesses\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(path)) return reply({ message: 'Invalid business identifier' }, 400);
-    const body = method === 'POST' ? await json(request) : undefined;
+    if (!flowPath && path !== '/identity/me' && path !== '/businesses' && path !== '/commercial/purchase-requests' && !/^\/businesses\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(path)) return reply({ message: 'Invalid business identifier' }, 400);
+    const body = method !== 'GET' ? await json(request, flowPath ? 65536 : 16384) : undefined;
     let token = request.cookies.get(accessCookie)?.value;
     if (!token) {
       const renewal = await renew(request);

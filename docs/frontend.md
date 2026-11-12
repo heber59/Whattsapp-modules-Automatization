@@ -8,11 +8,13 @@ The shared header provides English/Spanish labels and light/dark themes. Prefere
 
 Visitors can leave an email or international phone number and explicit contact consent without an account. The footer credits Heber Santiago Alvarez Rincon and links to his contact form. No owner contact address is invented.
 
-Plan choices come from the backend. Buy plan opens the account and purchase-details flow. Signed-in customers can save their details for later payment. The single full-access plan costs COP 50,000/month and includes personal assistance. Checkout remains unavailable; the interface never treats a request as payment. WhatsApp connection remains on the roadmap. The sign-in dialog preserves the selected plan. Customers creating an account are guided to return to Plans.
+Plan choices come from the backend. Buy plan opens the account and purchase-details flow. Signed-in customers can save their details for later payment. The single full-access plan costs COP 50,000/month and includes personal assistance. Checkout remains unavailable; the interface never treats a request as payment. WhatsApp replies require separately configured Meta credentials and webhook setup. The sign-in dialog preserves the selected plan. Customers creating an account are guided to return to Plans.
 
 /signup registers through a same-origin server proxy. Customers complete any provider email confirmation and sign in through the existing dialog or /login. /api/session verifies the profile. Provider tokens remain in HttpOnly cookies and are never exposed to browser code.
 
-/flows requires a verified session and provides a scrollable SVG canvas, step settings, graph validation, and customer preview. Drafts are stored per application user on the current device; server persistence and publication remain pending. The original shared draft key stays untouched. Switching language does not change user-authored text.
+/flows requires a verified session. Select a business and create, load, name, or save its server drafts. Optimistic revisions reject conflicting saves without overwriting local edits. Owners/admins can publish a validated immutable version; operators can view and preview. Publication alone does not enable WhatsApp execution. Save status compares the exact submitted snapshot, preserving edits made during requests. Business/flow switches, page links, and tab closing warn about unsaved changes and have separate per-user/business/flow device recovery copies when storage works. Original browser drafts remain untouched and require explicit import. Graph validation and customer preview remain available; switching language does not change user content.
+
+/whatsapp and each business detail expose channel readiness and published-flow assignment. Owners/admins assign the server-configured pilot phone; operators view only. The interface never collects credentials. A registered assignment does not claim Meta connectivity or delivery. Missing setup shows steps for creating the Meta app, configuring the server and public webhook, publishing a flow, and testing a conversation.
 
 ## Organization
 

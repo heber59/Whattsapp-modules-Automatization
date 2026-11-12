@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePortal } from '../portal';
+import { ChannelSetup } from '../../features/whatsapp/channel-setup';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type FormEvent } from 'react';
 
@@ -97,7 +98,7 @@ export function BusinessArea({ businessId }: { businessId?: string }) {
         <Link className="eyebrow" href="/">Whattsapp Automatization</Link>
         <button className="secondary-button" onClick={() => void logout()} disabled={pending}>{t('Sign out', 'Cerrar sesión')}</button>
       </nav>
-      <p><Link className="button-link" href="/flows">{t("Create a flow", "Crear un flujo")} ↗</Link></p>
+      <p className="workspace-shortcuts"><Link className="button-link" href="/flows">{t("Create a flow", "Crear un flujo")} ↗</Link><Link className="button-link secondary-button" href="/whatsapp">{t("WhatsApp setup", "Configurar WhatsApp")} ↗</Link></p>
       <h1>{businessId ? t('Your business.', 'Tu negocio.') : t('Your businesses.', 'Tus negocios.')}</h1>
       {businessId && <Link href="/businesses">{t('← All businesses', '← Todos los negocios')}</Link>}
       {error && <div className="form-feedback" role="alert"><p>{error}</p>
@@ -105,9 +106,9 @@ export function BusinessArea({ businessId }: { businessId?: string }) {
       </div>}
       {!businesses && !error && <p role="status">{t('Loading your account…', 'Cargando tu cuenta…')}</p>}
       {businesses && <>
-        {businessId ? businesses.map((business) => <article className="account-card" key={business.id}>
+        {businessId ? businesses.map((business) => <div key={business.id}><article className="account-card">
           <h2>{business.name}</h2><p>{t('Your role: ', 'Tu rol: ')}<strong>{t(business.role, ({owner:"propietario",admin:"administrador",operator:"operador"})[business.role])}</strong></p>
-        </article>) : <>
+        </article><ChannelSetup businessId={business.id} role={business.role} /></div>) : <>
           <p>{t('Choose a business or create one to get started.', 'Elige un negocio o crea uno para empezar.')}</p>
           {businesses.length === 0 ? <p className="empty-state">{t('You have no businesses yet. Create your first one below.', 'Aún no tienes negocios. Crea el primero aquí.')}</p>
             : <ul className="business-list">{businesses.map((business) => <li key={business.id}>

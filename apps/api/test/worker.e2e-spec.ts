@@ -10,7 +10,7 @@ import { WorkerModule } from '../src/worker.module';
 import { SYSTEM_PING, SYSTEM_QUEUE } from '../src/shared/queue/queue.constants';
 import { FixtureCleanup } from './fixture-cleanup';
 
-test('the worker processes a real job without starting the API or PostgreSQL', { timeout: 20000 }, async () => {
+test('the worker processes a real diagnostic job without starting the API', { timeout: 20000 }, async () => {
   const cleanup = new FixtureCleanup();
   const worker = await Test.createTestingModule({ imports: [WorkerModule] }).compile();
   worker.useLogger(false);

@@ -3,14 +3,13 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import './flows.css';
+import { useFlowPersistence } from './use-flow-persistence';
 import { usePortal, WorkspaceGate } from '../portal';
 
 import {
   example,
-  key,
   kinds,
   validateFlow,
-  validDraft,
   type Step,
   type Kind,
 } from './flow-model';
@@ -31,12 +30,10 @@ function Playground() {
     'Pickup is available at the counter.': 'Puedes recoger tu pedido en el mostrador.', 'See you soon!': '¡Hasta pronto!'
   };
   const translate = (message: string) => t(message, messages[message] ?? message);
-  const storageKey = key + '.' + user!.id;
+
   const kindLabel = (kind: Kind) => t(kind, ({ Start: 'Inicio', Message: 'Mensaje', Menu: 'Menú', End: 'Fin' })[kind]);
   const [steps, setSteps] = useState<Step[]>([]);
   const [selected, select] = useState('');
-  const [ready, setReady] = useState(false);
-  const [storageError, setStorageError] = useState(false);
   const [error, setError] = useState('');
   const [chat, setChat] = useState<{ text: string; user?: boolean }[]>([]);
   const [at, setAt] = useState('');
@@ -47,27 +44,10 @@ function Playground() {
     left: number;
     top: number;
   } | null>(null);
-  useEffect(() => {
-    let loaded: Step[] = [];
-    try {
-      const saved = JSON.parse(localStorage.getItem(storageKey) ?? '[]');
-      if (validDraft(saved)) loaded = saved;
-    } catch {}
-    queueMicrotask(() => {
-      setSteps(loaded);
-      select(loaded[0]?.id ?? '');
-      setReady(true);
-    });
-  }, [storageKey]);
-  useEffect(() => {
-    if (!ready) return;
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(steps));
-      queueMicrotask(() => setStorageError(false));
-    } catch {
-      queueMicrotask(() => setStorageError(true));
-    }
-  }, [steps, ready, storageKey]);
+  const persistence = useFlowPersistence(user!.id, steps, setSteps, t);
+  const ready = !persistence.loading && !!persistence.businessId;
+  const editable = ready && persistence.writable;
+  useEffect(() => { queueMicrotask(() => { select(''); setChat([]); setAt(''); setError(''); }); }, [persistence.flow?.id, persistence.flow?.revision, persistence.businessId]);
   const active = steps.find((step) => step.id === selected);
   const current = steps.find((step) => step.id === at);
   function edit(next: Step[]) {
@@ -126,18 +106,16 @@ function Playground() {
     height = Math.max(640, ...steps.map((step) => step.y + 115));
   return (
     <main className="studio">
-      <Link className="studio-back" href="/businesses">← {t("My workspace", "Mi espacio")}</Link>
+      <nav className="studio-route-links"><Link className="studio-back" href="/businesses">← {t("My workspace", "Mi espacio")}</Link><Link className="studio-back" href="/whatsapp">{t("WhatsApp setup", "Configurar WhatsApp")} ↗</Link></nav>
       <header>
         <div>
           <h1>{t("Flow studio", "Estudio de flujos")}</h1>
           <p>
-            {storageError
-              ? t('Browser storage unavailable.', 'Almacenamiento del navegador no disponible.')
-              : t('Private draft · saved on this device', 'Borrador privado · guardado en este dispositivo')}
+            {t('Business drafts and immutable published versions. WhatsApp execution is not connected.', 'Borradores por negocio y versiones publicadas inmutables. La ejecución de WhatsApp no está conectada.')}
           </p>
         </div>
         <button
-          disabled={!ready}
+          disabled={!editable}
           onClick={() => {
             if (
               !steps.length ||
@@ -151,9 +129,32 @@ function Playground() {
           {t("Load example", "Cargar ejemplo")}
         </button>
       </header>
+      <section className="flow-manager" aria-label={t('Server flow management', 'Gestión de flujos en el servidor')}>
+        <div className="flow-manager-fields">
+          <label>{t('Business', 'Negocio')}<select value={persistence.businessId} disabled={persistence.busy || persistence.loading} onChange={event => void persistence.chooseBusiness(event.target.value)}><option value="">{t('Choose a business', 'Elige un negocio')}</option>{persistence.businesses.map(business => <option key={business.id} value={business.id}>{business.name}</option>)}</select></label>
+          <label>{t('Flow', 'Flujo')}<select value={persistence.flow?.id ?? ''} disabled={!ready || persistence.busy} onChange={event => void persistence.loadFlow(event.target.value)}><option value="">{t('New flow', 'Flujo nuevo')}</option>{persistence.flows.map(flow => <option key={flow.id} value={flow.id}>{flow.name}</option>)}</select></label>
+          <label>{t('Flow name', 'Nombre del flujo')}<input value={persistence.name} maxLength={100} disabled={!editable || persistence.busy} onChange={event => persistence.setName(event.target.value)} /></label>
+        </div>
+        <div className="flow-manager-actions">
+          <button disabled={!editable || persistence.busy || !persistence.dirty && !!persistence.flow} onClick={() => void persistence.save()}>{persistence.busy ? t('Please wait…', 'Espera…') : t('Save draft', 'Guardar borrador')}</button>
+          <button disabled={!editable || persistence.busy || !persistence.flow || persistence.dirty} onClick={() => void persistence.publish()}>{t('Publish version', 'Publicar versión')}</button>
+          {persistence.flow && <button className="secondary-button" disabled={!editable || persistence.busy} onClick={persistence.newCopy}>{t('Copy into a new flow', 'Copiar a un flujo nuevo')}</button>}
+          {persistence.flow && <button className="secondary-button" disabled={!ready || persistence.busy} onClick={() => void persistence.loadFlow(persistence.flow!.id)}>{t('Reload server draft', 'Recargar borrador del servidor')}</button>}
+        </div>
+        <p role="status">{persistence.loading ? t('Loading…', 'Cargando…') : !persistence.businessId ? t('Choose a business to create or open a flow.', 'Elige un negocio para crear o abrir un flujo.') : persistence.dirty ? t('Unsaved changes', 'Cambios sin guardar') : persistence.flow ? t('Draft matches server', 'El borrador coincide con el servidor') : t('New empty draft', 'Nuevo borrador vacío')}{persistence.flow && ` · ${t('Revision', 'Revisión')} ${persistence.flow.revision} · ${t('Published version', 'Versión publicada')} ${persistence.flow.publishedVersion ?? '—'}`}</p>
+        {persistence.flow && persistence.dirty && <p>{t('Save your changes before publishing. Published versions never change.', 'Guarda los cambios antes de publicar. Las versiones publicadas nunca cambian.')}</p>}
+        {persistence.businessId && !persistence.writable && <p>{t('Your operator role can view flows but cannot save or publish.', 'Tu rol de operador puede ver flujos pero no guardar ni publicar.')}</p>}
+        {!persistence.loading && !persistence.businesses.length && <p><Link href="/businesses">{t('Create a business to get started', 'Crea un negocio para empezar')} →</Link></p>}
+        {persistence.localDraft && <button className="secondary-button" disabled={!editable || persistence.busy} onClick={persistence.importLocal}>{t('Import original browser draft', 'Importar borrador original del navegador')}</button>}
+        {persistence.recovery && <button className="secondary-button" disabled={!editable || persistence.busy} onClick={persistence.restore}>{t('Restore unsaved device copy', 'Restaurar copia local sin guardar')}</button>}
+        {persistence.storageError && <p role="alert">{t('Device recovery storage is unavailable. Keep this page open until you save.', 'La recuperación local no está disponible. Mantén esta página abierta hasta guardar.')}</p>}
+        {persistence.error && <p className="form-feedback" role="alert">{persistence.error}</p>}
+        {persistence.notice && <p role="status">{persistence.notice}</p>}
+      </section>
+      <fieldset className="flow-editor" disabled={!ready}>
       <div className="tools" aria-label={t("Add steps", "Agregar pasos")}>
         {kinds.map((k) => (
-          <button key={k} disabled={!ready} onClick={() => add(k)}>
+          <button key={k} disabled={!editable || steps.length >= 200} onClick={() => add(k)}>
             + {kindLabel(k)}
           </button>
         ))}
@@ -204,6 +205,7 @@ function Playground() {
               onClick={() => select(step.id)}
               onPointerDown={(e) => {
                 select(step.id);
+                if (!editable) return;
                 e.currentTarget.setPointerCapture(e.pointerId);
                 drag.current = {
                   id: step.id,
@@ -251,13 +253,13 @@ function Playground() {
       </div>
       <div className="panels">
         <article>
-          <h2>{t("Step settings", "Ajustes del paso")}</h2>
+          <fieldset className="flow-editor" disabled={!editable}><h2>{t("Step settings", "Ajustes del paso")}</h2>
           {active ? (
             <>
               <label>
                 {t("Step text", "Texto del paso")}
                 <input
-                  value={active.text}
+                  maxLength={4000} value={active.text}
                   onChange={(e) => patch({ text: e.target.value })}
                 />
               </label>
@@ -267,7 +269,7 @@ function Playground() {
                     <label>
                       {t("Reply", "Respuesta")} {i + 1}
                       <input
-                        value={choice.label}
+                        maxLength={200} value={choice.label}
                         onChange={(e) =>
                           patch({
                             choices: active.choices.map((item, j) =>
@@ -350,7 +352,7 @@ function Playground() {
           ) : (
             <p>{t("Select a step on the canvas to edit it.", "Selecciona un paso en el lienzo para editarlo.")}</p>
           )}
-        </article>
+        </fieldset></article>
         <article>
           <h2>{t("Customer preview", "Vista del cliente")}</h2>
           <button
@@ -379,6 +381,6 @@ function Playground() {
           </div>
         </article>
       </div>
-      </div></main>
+      </div></fieldset></main>
   );
 }

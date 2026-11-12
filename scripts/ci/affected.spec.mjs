@@ -23,6 +23,10 @@ test('API and worker selection includes deletions and shared changes', () => {
   assert(worker.worker && !worker.api && !worker.web);
   const shared = affected(['apps/api/src/shared/config/config.ts']);
   assert(shared.api && shared.worker && !shared.web);
+  for (const module of ['businesses', 'identity', 'flows', 'whatsapp']) {
+    const dependency = affected([`apps/api/src/modules/${module}/${module}.module.ts`]);
+    assert(dependency.api && dependency.worker && !dependency.web, `${module} is also loaded by the worker`);
+  }
 });
 
 test('contracts and global configuration include their consumers', () => {

@@ -5,14 +5,14 @@ GitHub Actions checks PRs targeting develop/main and pushes to those branches. H
 | Changed area | Verification |
 | --- | --- |
 | apps/web/ | Frontend: ESLint, types, build; no PostgreSQL or Redis. |
-| HTTP, health, identity, authentication | API: ESLint, types, unit/end-to-end tests, build; temporary PostgreSQL and Redis. |
-| Worker entry point or consumer | Worker: ESLint, types, unit/end-to-end tests, build; Redis only. |
+| HTTP, health, authentication | API: ESLint, types, unit/end-to-end tests, build; temporary PostgreSQL and Redis. |
+| Worker entry point or consumer | Worker: ESLint, types, unit/end-to-end tests, build; temporary PostgreSQL and Redis. |
 | Shared backend code or infrastructure | API and worker. |
 | packages/contracts/ | Contracts and their consumers: frontend, API, worker. |
 | Lockfile, global settings, CI logic | All services, conservatively. |
 | Documentation only | Change detection and final result; no application services. |
 
-Changes are calculated against the PR merge base or previous push commit. Missing history triggers all checks. Focused detector tests protect these rules. Future backend modules are shared unless explicitly classified.
+Changes use the PR merge base or previous push commit. Missing history triggers all checks. Focused detector tests protect these rules. Businesses, identity, flows, and WhatsApp are shared worker/API dependencies. Future backend modules are shared unless explicitly classified.
 
 ## Quality and security
 - ESLint checks code; run it locally with pnpm lint.
