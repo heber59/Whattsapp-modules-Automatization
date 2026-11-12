@@ -29,3 +29,9 @@
 .flow-manager p { font-size:12px; margin:14px 0 0; }
 .flow-manager>button { margin:12px 8px 0 0; }
 @media(max-width:800px) { .flow-manager-fields { grid-template-columns:1fr; } }
+.studio textarea { width:100%;padding:10px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;font:12px monospace;resize:vertical; }
+.studio pre { white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px; }
+.studio .tools { flex-wrap:wrap; }
+.node-config { border-block:1px solid var(--line);padding:8px 0; }
+.node-config input[type=checkbox] { width:auto; }
+.operations article + article { border-top:1px solid var(--line); }

@@ -195,6 +195,14 @@ export async function flows(request: NextRequest, path: string, method: Authenti
   return authenticatedRequest(request, path, method, true);
 }
 
+export async function operations(request: NextRequest, path: string, method: 'GET' | 'POST'): Promise<NextResponse> {
+  const uuid = '[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';
+  const base = '/businesses/' + uuid + '/operations';
+  if (!(method === 'GET' && new RegExp('^' + base + '(?:/conversations/[0-9]{5,20})?$','i').test(path))
+    && !(method === 'POST' && new RegExp('^' + base + '/actions$','i').test(path))) return reply({message:'Invalid operations request'},400);
+  return authenticatedRequest(request,path,method,true);
+}
+
 async function authenticatedRequest(request: NextRequest, path: string, method: AuthenticatedMethod, flowPath = false): Promise<NextResponse> {
   let refreshed: Session | undefined;
   try {

@@ -1,41 +1,33 @@
 # Frontend architecture
 
-Next.js App Router and TypeScript. The current playground uses SVG; React Flow remains planned.
+Next.js App Router and TypeScript. The visual editor uses SVG; React Flow remains a future option. See the accepted [product scope](product-scope.md).
 
-## Portal
+## Portal and sessions
 
-The shared header provides English/Spanish labels and light/dark themes. Preferences persist locally. The landing page serves businesses worldwide, with separate paths to plans and personal consultation.
+The shared header provides English/Spanish labels, light/dark themes, and locally persisted preferences. Visitors submit contact requests with consent. Plan requests are saved for personal follow-up; checkout and paid entitlement activation remain unavailable.
 
-Visitors can leave an email or international phone number and explicit contact consent without an account. The footer credits Heber Santiago Alvarez Rincon and links to his contact form. No owner contact address is invented.
+Registration, login, session refresh, sign-out, and password recovery use same-origin server proxies. Provider tokens remain in HttpOnly cookies. Real Supabase acceptance remains pending.
 
-Plan choices come from the backend. Buy plan opens the account and purchase-details flow. Signed-in customers can save their details for later payment. The single full-access plan costs COP 50,000/month and includes personal assistance. Checkout remains unavailable; the interface never treats a request as payment. WhatsApp replies require separately configured Meta credentials and webhook setup. The sign-in dialog preserves the selected plan. Customers creating an account are guided to return to Plans.
+## Configurable flow authoring
 
-/signup registers through a same-origin server proxy. Customers complete any provider email confirmation and sign in through the existing dialog or /login. /api/session verifies the profile. Provider tokens remain in HttpOnly cookies and are never exposed to browser code.
+/flows requires a verified session and business selection. Owners/admins create and save drafts and publish immutable versions; operators view and preview. Optimistic revisions reject conflicting saves. Navigation warns about unsaved changes, and scoped device recovery copies preserve valid draft edits.
 
-/flows requires a verified session. Select a business and create, load, name, or save its server drafts. Optimistic revisions reject conflicting saves without overwriting local edits. Owners/admins can publish a validated immutable version; operators can view and preview. Publication alone does not enable WhatsApp execution. Save status compares the exact submitted snapshot, preserving edits made during requests. Business/flow switches, page links, and tab closing warn about unsaved changes and have separate per-user/business/flow device recovery copies when storage works. Original browser drafts remain untouched and require explicit import. Graph validation and customer preview remain available; switching language does not change user content.
+The editor supports Start, Message, Menu, End, Input, Set, Calculate, Condition, Document, Image, Catalog, Cart, Order, Notify, and Handoff. Businesses choose node sequence, customer questions, product options, pricing, shipping conditions, confirmation mode, and notification content. Availability remains the business's responsibility.
 
-/whatsapp and each business detail expose channel readiness and published-flow assignment. Owners/admins assign the server-configured pilot phone; operators view only. The interface never collects credentials. A registered assignment does not claim Meta connectivity or delivery. Missing setup shows steps for creating the Meta app, configuring the server and public webhook, publishing a flow, and testing a conversation.
+Node settings provide fields for common values and editable configuration JSON for expressions, products, comparisons, and order fields. Expressions support flat variable references and add/subtract/multiply/divide operations; they cannot run arbitrary code or access nested paths. Text interpolation uses {{variable}}. Conditions use their first destination for true and second for false. Media requires an HTTPS URL. Catalogs support text-based product selection; they are not Meta Commerce catalogs.
 
-## Organization
+JSON import/export uses the same versioned declarative definition as MCP tooling. Imports replace the local draft only after confirmation when it contains steps; saving and publishing remain separate actions. Invalid configuration JSON blocks saving and step switches and warns before navigation.
 
-```text
-apps/web/src/
-├── app/                       # Routes, layouts, and composition
-│   ├── api/                   # Same-origin server proxies
-│   ├── flows/                 # Current editor playground
-│   ├── signup/                # Account creation
-│   └── portal.tsx             # Shared session, preferences, sign-in
-├── features/
-│   └── commercial/            # Contact and plan-request UI
-├── server/                    # Server-only API/session helpers
-└── shared/                    # Reusable components and utilities
-```
+Customer preview uses the shared runtime for input validation, variables, branching, calculations, carts, and intended actions. It displays media references, proposed orders, notifications, and human pauses without sending messages or creating operational records. Human approval and handoff stop the preview for operator attention.
+
+## Operations
+
+/operations provides business-scoped notifications, conversations and history, captured variables, order search/status filters, pending-order approval/cancellation, operator replies, bot pause/resume, and delivery review. Manual operator pauses and flow pauses both enable human attention.
+
+Notify/Handoff selects workspace notifications or WhatsApp alerts to a consenting owner's/advisor's E.164 number. WhatsApp requires an approved template name and language, with one body placeholder for notification text. Operations shows delivery state; provider acceptance does not prove device receipt. Owners/admins can verify or discard uncertain/failed alerts after provider review. Email/push alerts remain unavailable. Operator replies require an eligible customer messaging window. Recovery never blindly resends; backend authorization remains authoritative.
+
+Same-origin operations proxies enforce session renewal, request-origin checks, bounded JSON bodies, allowed paths, and noncached responses. /whatsapp assigns a published version to the server-configured pilot number; assignment does not prove live delivery.
 
 ## Implementation rules
 
-- Keep pages small; delegate behavior to focused features.
-- Dependency direction is app → features → shared; avoid cycles.
-- Default to server components. Use client components for interaction and keep secrets server-only.
-- Separate interface state from remote state.
-- Validate external input, sessions, and business access on the server.
-- Keep focused unit tests next to relevant code and critical journeys in apps/web/e2e/.
+Keep routes focused, secrets server-only, and interface state separate from remote state. Validate sessions, input, and business access server-side. Maintain focused tests and critical end-to-end journeys.

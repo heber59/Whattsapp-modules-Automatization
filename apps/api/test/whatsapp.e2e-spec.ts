@@ -1,3 +1,4 @@
+import { NotificationSenderService } from '../src/modules/whatsapp/notification-sender.service';
 import 'reflect-metadata';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -121,7 +122,7 @@ test('Signed WhatsApp messages execute pinned menus, deduplicate, preserve order
     assert.equal(pending.rows[0]!.state,'pending'); assert.equal(pending.rows[0]!.attempts,1);
     mode = 'ok'; await database.query("UPDATE app.whatsapp_outbox SET available_at=now() WHERE inbox_id='rate'");
     // A new worker object recovers persisted work without an in-memory queue.
-    const restarted = new WhatsAppWorkerService(settings,app.get(WhatsAppRuntimeService),app.get(WhatsAppSenderService));
+    const restarted = new WhatsAppWorkerService(settings,app.get(WhatsAppRuntimeService),app.get(WhatsAppSenderService),app.get(NotificationSenderService));
     await restarted.runOnce();
     assert.equal((await database.query("SELECT state FROM app.whatsapp_outbox WHERE inbox_id='rate'")).rows[0]!.state,'sent');
     // Ambiguous network outcome pauses, rather than blindly resending.

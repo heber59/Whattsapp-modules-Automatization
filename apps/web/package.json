@@ -3,11 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --hostname 127.0.0.1",
-    "build": "next build",
+    "dev": "pnpm --filter @wa/contracts build && next dev --hostname 127.0.0.1",
+    "build": "pnpm --filter @wa/contracts build && next build",
     "start": "next start --hostname 127.0.0.1",
-    "test:e2e": "node --test e2e/session.test.mjs",
-    "typecheck": "next typegen && tsc --noEmit",
+    "test:e2e": "pnpm --filter @wa/contracts build && node --test e2e/session.test.mjs",
+    "typecheck": "pnpm --filter @wa/contracts build && next typegen && tsc --noEmit",
     "lint": "eslint src next.config.mjs --max-warnings=0"
   },
   "dependencies": {
