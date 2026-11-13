@@ -19,7 +19,7 @@
   "dependencies": {
     "@nestjs/common": "12.4.0",
     "@nestjs/core": "12.4.0",
-    "@nestjs/platform-express": "12.4.0",
+    "@nestjs/platform-express": "12.4.2",
     "@nestjs/config": "12.1.1",
     "@wa/contracts": "workspace:*",
     "bullmq": "6.7.2",
