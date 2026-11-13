@@ -17,7 +17,7 @@
     "db:migrate": "ts-node src/shared/database/migrate.ts"
   },
   "dependencies": {
-    "@nestjs/common": "12.4.0",
+    "@nestjs/common": "12.4.2",
     "@nestjs/core": "12.4.0",
     "@nestjs/platform-express": "12.4.0",
     "@nestjs/config": "12.1.1",
