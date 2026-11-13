@@ -35,8 +35,8 @@
     "@types/node": "^26.6.6",
     "@types/pg": "^8.15.0",
     "ts-node": "10.9.2",
-    "typescript": "5.9.3",
-    "@nestjs/testing": "12.4.0"
+    "typescript": "7.0.2",
+    "@nestjs/testing": "12.4.2"
   },
   "files": [
     "dist",
