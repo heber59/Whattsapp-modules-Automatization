@@ -17,12 +17,12 @@
     "db:migrate": "ts-node src/shared/database/migrate.ts"
   },
   "dependencies": {
-    "@nestjs/common": "12.4.0",
+    "@nestjs/common": "12.4.2",
     "@nestjs/core": "12.4.0",
-    "@nestjs/platform-express": "12.4.0",
+    "@nestjs/platform-express": "12.4.2",
     "@nestjs/config": "12.1.1",
     "@wa/contracts": "workspace:*",
-    "bullmq": "6.7.2",
+    "bullmq": "6.7.3",
     "ioredis": "^6.0.0",
     "pg": "^8.16.0",
     "reflect-metadata": "^0.2.2",
@@ -36,7 +36,7 @@
     "@types/pg": "^8.15.0",
     "ts-node": "10.9.2",
     "typescript": "5.9.3",
-    "@nestjs/testing": "12.4.0"
+    "@nestjs/testing": "12.4.2"
   },
   "files": [
     "dist",
